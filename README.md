@@ -1,18 +1,155 @@
-# React + Vite
+# Digilib UNISMU – Perpustakaan Digital
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplikasi perpustakaan digital Universitas Muslim Indonesia (UNISMU), dibangun dengan **React + Vite** (frontend) dan **Node.js + Express** (backend).
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Fitur
 
-## React Compiler
+- 📚 Katalog buku dengan pencarian dan filter kategori
+- 🔐 Autentikasi pengguna (JWT) – registrasi & login
+- 📖 Peminjaman & pengembalian buku
+- 🛠️ Dashboard admin – manajemen buku, kategori, dan pengguna
+- 📁 Upload cover buku dan file PDF
+- 🗄️ Database SQLite (tidak perlu server database terpisah)
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+---
 
-Note: This will impact Vite dev & build performances.
+## Teknologi
 
-## Expanding the ESLint configuration
+| Layer    | Teknologi                              |
+|----------|----------------------------------------|
+| Frontend | React 19, React Router v7, Axios, Vite |
+| Backend  | Node.js, Express 4, better-sqlite3     |
+| Auth     | JWT (jsonwebtoken), bcryptjs           |
+| Upload   | Multer 2                               |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## Prasyarat
+
+- Node.js ≥ 18
+- npm ≥ 9
+
+---
+
+## Cara Menjalankan
+
+### 1. Backend
+
+```bash
+cd backend
+npm install
+
+# Salin file konfigurasi dan sesuaikan nilainya
+cp .env.example .env
+
+# Isi database dengan data awal (opsional)
+npm run seed
+
+# Jalankan server (production)
+npm start
+
+# Jalankan server (development dengan auto-reload)
+npm run dev
+```
+
+Server berjalan di **http://localhost:5000**
+
+**Akun bawaan setelah seeding:**
+
+| Role  | Email                       | Password  |
+|-------|-----------------------------|-----------|
+| Admin | admin@unismu.ac.id          | admin123  |
+| User  | mahasiswa@unismu.ac.id      | user123   |
+
+### 2. Frontend
+
+```bash
+# Di root project
+npm install
+npm run dev
+```
+
+Aplikasi berjalan di **http://localhost:5173**
+
+---
+
+## Konfigurasi Environment (Backend)
+
+Buat file `backend/.env` berdasarkan `backend/.env.example`:
+
+```env
+PORT=5000
+JWT_SECRET=ganti_dengan_secret_yang_kuat
+JWT_EXPIRES_IN=7d
+NODE_ENV=development
+```
+
+## Konfigurasi Environment (Frontend)
+
+Buat file `.env.local` di root untuk mengubah URL API:
+
+```env
+VITE_API_URL=http://localhost:5000/api
+```
+
+---
+
+## Struktur Proyek
+
+```
+digilib-unismu/
+├── src/                    # Frontend React
+│   ├── api/                # Axios instance
+│   ├── components/         # Komponen (Navbar, ProtectedRoute)
+│   ├── context/            # AuthContext (JWT state)
+│   └── pages/              # Home, Books, BookDetail, Login, Register, Profile, Admin
+├── backend/                # Backend Node.js
+│   ├── database/           # db.js (schema), seed.js (data awal)
+│   ├── middleware/         # auth.js (JWT middleware)
+│   ├── routes/             # auth, books, categories, users
+│   ├── uploads/            # cover & file uploads
+│   └── server.js           # Entry point Express
+└── README.md
+```
+
+---
+
+## API Endpoints
+
+### Auth
+| Method | Endpoint              | Deskripsi        |
+|--------|-----------------------|------------------|
+| POST   | /api/auth/register    | Daftar akun baru |
+| POST   | /api/auth/login       | Login            |
+
+### Buku
+| Method | Endpoint                  | Akses       |
+|--------|---------------------------|-------------|
+| GET    | /api/books                | Publik      |
+| GET    | /api/books/:id            | Publik      |
+| POST   | /api/books                | Admin       |
+| PUT    | /api/books/:id            | Admin       |
+| DELETE | /api/books/:id            | Admin       |
+| POST   | /api/books/:id/borrow     | User login  |
+| POST   | /api/books/:id/return     | User login  |
+
+### Kategori
+| Method | Endpoint              | Akses  |
+|--------|-----------------------|--------|
+| GET    | /api/categories       | Publik |
+| POST   | /api/categories       | Admin  |
+| PUT    | /api/categories/:id   | Admin  |
+| DELETE | /api/categories/:id   | Admin  |
+
+### Pengguna
+| Method | Endpoint              | Akses  |
+|--------|-----------------------|--------|
+| GET    | /api/users/me         | Login  |
+| PUT    | /api/users/me         | Login  |
+| GET    | /api/users/me/borrows | Login  |
+| GET    | /api/users            | Admin  |
+| DELETE | /api/users/:id        | Admin  |
+| GET    | /api/users/borrows    | Admin  |
+
