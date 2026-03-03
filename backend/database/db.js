@@ -13,7 +13,7 @@ async function initSchema() {
       name       TEXT        NOT NULL,
       email      TEXT        NOT NULL UNIQUE,
       password   TEXT        NOT NULL,
-      role       TEXT        NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user')),
+      role       TEXT        NOT NULL DEFAULT 'user' CHECK(role IN ('admin','user','kepala IT')),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
