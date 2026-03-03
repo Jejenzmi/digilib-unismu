@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend
+backend/node_modules
+backend/.env
+backend/database/digilib.db
+backend/database/*.db-wal
+backend/database/*.db-shm
+backend/uploads/covers/*
+backend/uploads/files/*
+!backend/uploads/covers/.gitkeep
+!backend/uploads/files/.gitkeep
