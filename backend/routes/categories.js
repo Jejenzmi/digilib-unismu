@@ -5,73 +5,90 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const router = express.Router();
 
 // GET /api/categories  – public
-router.get('/', (req, res) => {
-  const db = getDb();
-  const categories = db
-    .prepare(
-      `SELECT c.*, COUNT(b.id) AS book_count
+router.get('/', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query(
+      `SELECT c.*, COUNT(b.id)::int AS book_count
        FROM categories c
        LEFT JOIN books b ON b.category_id = c.id
        GROUP BY c.id
        ORDER BY c.name`
-    )
-    .all();
-  res.json(categories);
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // GET /api/categories/:id  – public
-router.get('/:id', (req, res) => {
-  const db = getDb();
-  const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
-  if (!category) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
-  res.json(category);
+router.get('/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query('SELECT * FROM categories WHERE id = $1', [req.params.id]);
+    if (!result.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // POST /api/categories  – admin only
-router.post('/', authenticate, requireAdmin, (req, res) => {
+router.post('/', authenticate, requireAdmin, async (req, res) => {
   const { name, description } = req.body;
   if (!name) return res.status(400).json({ message: 'Nama kategori wajib diisi' });
 
-  const db = getDb();
-  const existing = db.prepare('SELECT id FROM categories WHERE name = ?').get(name);
-  if (existing) return res.status(409).json({ message: 'Kategori sudah ada' });
+  try {
+    const db = getDb();
+    const existing = await db.query('SELECT id FROM categories WHERE name = $1', [name]);
+    if (existing.rows[0]) return res.status(409).json({ message: 'Kategori sudah ada' });
 
-  const result = db
-    .prepare('INSERT INTO categories (name, description) VALUES (?, ?)')
-    .run(name, description || null);
-
-  const category = db
-    .prepare('SELECT * FROM categories WHERE id = ?')
-    .get(result.lastInsertRowid);
-  res.status(201).json({ message: 'Kategori berhasil ditambahkan', data: category });
+    const result = await db.query(
+      'INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING *',
+      [name, description || null]
+    );
+    res.status(201).json({ message: 'Kategori berhasil ditambahkan', data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // PUT /api/categories/:id  – admin only
-router.put('/:id', authenticate, requireAdmin, (req, res) => {
+router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   const { name, description } = req.body;
-  const db = getDb();
+  try {
+    const db = getDb();
+    const existing = await db.query('SELECT * FROM categories WHERE id = $1', [req.params.id]);
+    if (!existing.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
 
-  const existing = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
-
-  db.prepare('UPDATE categories SET name = ?, description = ? WHERE id = ?').run(
-    name ?? existing.name,
-    description ?? existing.description,
-    req.params.id
-  );
-
-  const updated = db.prepare('SELECT * FROM categories WHERE id = ?').get(req.params.id);
-  res.json({ message: 'Kategori berhasil diperbarui', data: updated });
+    const row = existing.rows[0];
+    const result = await db.query(
+      'UPDATE categories SET name = $1, description = $2 WHERE id = $3 RETURNING *',
+      [name ?? row.name, description ?? row.description, req.params.id]
+    );
+    res.json({ message: 'Kategori berhasil diperbarui', data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // DELETE /api/categories/:id  – admin only
-router.delete('/:id', authenticate, requireAdmin, (req, res) => {
-  const db = getDb();
-  const existing = db.prepare('SELECT id FROM categories WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const db = getDb();
+    const existing = await db.query('SELECT id FROM categories WHERE id = $1', [req.params.id]);
+    if (!existing.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
 
-  db.prepare('DELETE FROM categories WHERE id = ?').run(req.params.id);
-  res.json({ message: 'Kategori berhasil dihapus' });
+    await db.query('DELETE FROM categories WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Kategori berhasil dihapus' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 module.exports = router;

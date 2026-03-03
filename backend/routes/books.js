@@ -46,63 +46,72 @@ const upload = multer({
 ]);
 
 // GET /api/books  – public, supports search and category filter
-router.get('/', (req, res) => {
-  const { search, category_id } = req.query;
-  const { page, limit, offset } = parsePagination(req.query);
+router.get('/', async (req, res) => {
+  try {
+    const { search, category_id } = req.query;
+    const { page, limit, offset } = parsePagination(req.query);
 
-  const db = getDb();
-  let where = 'WHERE 1=1';
-  const params = [];
+    const db = getDb();
+    let where = 'WHERE 1=1';
+    const params = [];
+    let paramIdx = 1;
 
-  if (search) {
-    where += ' AND (b.title LIKE ? OR b.author LIKE ? OR b.isbn LIKE ?)';
-    const q = `%${search}%`;
-    params.push(q, q, q);
-  }
-  if (category_id) {
-    where += ' AND b.category_id = ?';
-    params.push(Number(category_id));
-  }
+    if (search) {
+      where += ` AND (b.title ILIKE $${paramIdx} OR b.author ILIKE $${paramIdx} OR b.isbn ILIKE $${paramIdx})`;
+      params.push(`%${search}%`);
+      paramIdx += 1;
+    }
+    if (category_id) {
+      where += ` AND b.category_id = $${paramIdx}`;
+      params.push(Number(category_id));
+      paramIdx += 1;
+    }
 
-  const total = db
-    .prepare(
-      `SELECT COUNT(*) as count FROM books b ${where}`
-    )
-    .get(...params).count;
+    const countResult = await db.query(
+      `SELECT COUNT(*) as count FROM books b ${where}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count, 10);
 
-  const books = db
-    .prepare(
+    const booksResult = await db.query(
       `SELECT b.*, c.name AS category_name
        FROM books b
        LEFT JOIN categories c ON b.category_id = c.id
        ${where}
        ORDER BY b.created_at DESC
-       LIMIT ? OFFSET ?`
-    )
-    .all(...params, limit, offset);
+       LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
+      [...params, limit, offset]
+    );
 
-  res.json({ total, page, limit, data: books });
+    res.json({ total, page, limit, data: booksResult.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // GET /api/books/:id  – public
-router.get('/:id', (req, res) => {
-  const db = getDb();
-  const book = db
-    .prepare(
+router.get('/:id', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query(
       `SELECT b.*, c.name AS category_name
        FROM books b
        LEFT JOIN categories c ON b.category_id = c.id
-       WHERE b.id = ?`
-    )
-    .get(req.params.id);
-
-  if (!book) return res.status(404).json({ message: 'Buku tidak ditemukan' });
-  res.json(book);
+       WHERE b.id = $1`,
+      [req.params.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // POST /api/books  – admin only
-router.post('/', authenticate, requireAdmin, (req, res) => {
-  upload(req, res, (err) => {
+router.post('/', authenticate, requireAdmin, async (req, res) => {
+  upload(req, res, async (err) => {
     if (err) return res.status(400).json({ message: err.message });
 
     const { title, author, isbn, category_id, description, publisher, year, available_copies } =
@@ -115,148 +124,170 @@ router.post('/', authenticate, requireAdmin, (req, res) => {
     const cover_image = req.files?.cover_image?.[0]?.filename || null;
     const file_path = req.files?.file?.[0]?.filename || null;
 
-    const db = getDb();
-    const result = db
-      .prepare(
+    try {
+      const db = getDb();
+      const result = await db.query(
         `INSERT INTO books (title, author, isbn, category_id, description, publisher, year, cover_image, file_path, available_copies)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .run(
-        title,
-        author,
-        isbn || null,
-        category_id ? Number(category_id) : null,
-        description || null,
-        publisher || null,
-        year ? Number(year) : null,
-        cover_image,
-        file_path,
-        available_copies ? Number(available_copies) : 1
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [
+          title,
+          author,
+          isbn || null,
+          category_id ? Number(category_id) : null,
+          description || null,
+          publisher || null,
+          year ? Number(year) : null,
+          cover_image,
+          file_path,
+          available_copies ? Number(available_copies) : 1,
+        ]
       );
-
-    const book = db.prepare('SELECT * FROM books WHERE id = ?').get(result.lastInsertRowid);
-    res.status(201).json({ message: 'Buku berhasil ditambahkan', data: book });
+      res.status(201).json({ message: 'Buku berhasil ditambahkan', data: result.rows[0] });
+    } catch (dbErr) {
+      console.error(dbErr);
+      res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+    }
   });
 });
 
 // PUT /api/books/:id  – admin only
-router.put('/:id', authenticate, requireAdmin, (req, res) => {
-  upload(req, res, (err) => {
+router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+  upload(req, res, async (err) => {
     if (err) return res.status(400).json({ message: err.message });
 
-    const db = getDb();
-    const existing = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+    try {
+      const db = getDb();
+      const existingResult = await db.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
+      if (!existingResult.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
 
-    const {
-      title,
-      author,
-      isbn,
-      category_id,
-      description,
-      publisher,
-      year,
-      available_copies,
-    } = req.body;
+      const existing = existingResult.rows[0];
+      const {
+        title,
+        author,
+        isbn,
+        category_id,
+        description,
+        publisher,
+        year,
+        available_copies,
+      } = req.body;
 
-    const cover_image = req.files?.cover_image?.[0]?.filename || existing.cover_image;
-    const file_path = req.files?.file?.[0]?.filename || existing.file_path;
+      const cover_image = req.files?.cover_image?.[0]?.filename || existing.cover_image;
+      const file_path = req.files?.file?.[0]?.filename || existing.file_path;
 
-    db.prepare(
-      `UPDATE books SET
-        title = ?, author = ?, isbn = ?, category_id = ?, description = ?,
-        publisher = ?, year = ?, cover_image = ?, file_path = ?,
-        available_copies = ?, updated_at = datetime('now')
-       WHERE id = ?`
-    ).run(
-      title ?? existing.title,
-      author ?? existing.author,
-      isbn ?? existing.isbn,
-      category_id ? Number(category_id) : existing.category_id,
-      description ?? existing.description,
-      publisher ?? existing.publisher,
-      year ? Number(year) : existing.year,
-      cover_image,
-      file_path,
-      available_copies ? Number(available_copies) : existing.available_copies,
-      req.params.id
-    );
-
-    const updated = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
-    res.json({ message: 'Buku berhasil diperbarui', data: updated });
+      const updated = await db.query(
+        `UPDATE books SET
+          title = $1, author = $2, isbn = $3, category_id = $4, description = $5,
+          publisher = $6, year = $7, cover_image = $8, file_path = $9,
+          available_copies = $10, updated_at = NOW()
+         WHERE id = $11
+         RETURNING *`,
+        [
+          title ?? existing.title,
+          author ?? existing.author,
+          isbn ?? existing.isbn,
+          category_id ? Number(category_id) : existing.category_id,
+          description ?? existing.description,
+          publisher ?? existing.publisher,
+          year ? Number(year) : existing.year,
+          cover_image,
+          file_path,
+          available_copies ? Number(available_copies) : existing.available_copies,
+          req.params.id,
+        ]
+      );
+      res.json({ message: 'Buku berhasil diperbarui', data: updated.rows[0] });
+    } catch (dbErr) {
+      console.error(dbErr);
+      res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+    }
   });
 });
 
 // DELETE /api/books/:id  – admin only
-router.delete('/:id', authenticate, requireAdmin, (req, res) => {
-  const db = getDb();
-  const existing = db.prepare('SELECT id FROM books WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const db = getDb();
+    const existing = await db.query('SELECT id FROM books WHERE id = $1', [req.params.id]);
+    if (!existing.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
 
-  db.prepare('DELETE FROM books WHERE id = ?').run(req.params.id);
-  res.json({ message: 'Buku berhasil dihapus' });
+    await db.query('DELETE FROM books WHERE id = $1', [req.params.id]);
+    res.json({ message: 'Buku berhasil dihapus' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // POST /api/books/:id/borrow  – authenticated users
-router.post('/:id/borrow', authenticate, (req, res) => {
-  const db = getDb();
-  const book = db.prepare('SELECT * FROM books WHERE id = ?').get(req.params.id);
-  if (!book) return res.status(404).json({ message: 'Buku tidak ditemukan' });
-  if (book.available_copies < 1) {
-    return res.status(400).json({ message: 'Stok buku tidak tersedia' });
-  }
+router.post('/:id/borrow', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const bookResult = await db.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
+    const book = bookResult.rows[0];
+    if (!book) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+    if (book.available_copies < 1) {
+      return res.status(400).json({ message: 'Stok buku tidak tersedia' });
+    }
 
-  const alreadyBorrowing = db
-    .prepare(
-      "SELECT id FROM borrows WHERE user_id = ? AND book_id = ? AND status = 'borrowed'"
-    )
-    .get(req.user.id, req.params.id);
-  if (alreadyBorrowing) {
-    return res.status(400).json({ message: 'Anda sudah meminjam buku ini' });
-  }
+    const alreadyBorrowing = await db.query(
+      "SELECT id FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
+      [req.user.id, req.params.id]
+    );
+    if (alreadyBorrowing.rows[0]) {
+      return res.status(400).json({ message: 'Anda sudah meminjam buku ini' });
+    }
 
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 14); // 2-week loan
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 14); // 2-week loan
 
-  const result = db
-    .prepare(
+    const result = await db.query(
       `INSERT INTO borrows (user_id, book_id, due_date)
-       VALUES (?, ?, ?)`
-    )
-    .run(req.user.id, req.params.id, dueDate.toISOString());
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [req.user.id, req.params.id, dueDate.toISOString()]
+    );
 
-  db.prepare('UPDATE books SET available_copies = available_copies - 1 WHERE id = ?').run(
-    req.params.id
-  );
+    await db.query('UPDATE books SET available_copies = available_copies - 1 WHERE id = $1', [
+      req.params.id,
+    ]);
 
-  res.status(201).json({
-    message: 'Peminjaman berhasil',
-    data: db.prepare('SELECT * FROM borrows WHERE id = ?').get(result.lastInsertRowid),
-  });
+    res.status(201).json({ message: 'Peminjaman berhasil', data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 });
 
 // POST /api/books/:id/return  – authenticated users
-router.post('/:id/return', authenticate, (req, res) => {
-  const db = getDb();
-  const borrow = db
-    .prepare(
-      "SELECT * FROM borrows WHERE user_id = ? AND book_id = ? AND status = 'borrowed'"
-    )
-    .get(req.user.id, req.params.id);
+router.post('/:id/return', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const borrowResult = await db.query(
+      "SELECT * FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
+      [req.user.id, req.params.id]
+    );
+    const borrow = borrowResult.rows[0];
 
-  if (!borrow) {
-    return res.status(400).json({ message: 'Tidak ada peminjaman aktif untuk buku ini' });
+    if (!borrow) {
+      return res.status(400).json({ message: 'Tidak ada peminjaman aktif untuk buku ini' });
+    }
+
+    await db.query(
+      "UPDATE borrows SET status = 'returned', return_date = NOW() WHERE id = $1",
+      [borrow.id]
+    );
+
+    await db.query('UPDATE books SET available_copies = available_copies + 1 WHERE id = $1', [
+      req.params.id,
+    ]);
+
+    res.json({ message: 'Pengembalian berhasil' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
   }
-
-  db.prepare(
-    "UPDATE borrows SET status = 'returned', return_date = datetime('now') WHERE id = ?"
-  ).run(borrow.id);
-
-  db.prepare('UPDATE books SET available_copies = available_copies + 1 WHERE id = ?').run(
-    req.params.id
-  );
-
-  res.json({ message: 'Pengembalian berhasil' });
 });
 
 module.exports = router;

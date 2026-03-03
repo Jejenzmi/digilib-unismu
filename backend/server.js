@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
+const { initSchema } = require('./database/db');
 const authRoutes = require('./routes/auth');
 const booksRoutes = require('./routes/books');
 const categoriesRoutes = require('./routes/categories');
@@ -63,9 +64,16 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ message: 'Terjadi kesalahan pada server' });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
-  console.log(`📚 Digilib UNISMU API siap digunakan`);
-});
+initSchema()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`🚀 Server berjalan di http://localhost:${PORT}`);
+      console.log(`📚 Digilib UNISMU API siap digunakan`);
+    });
+  })
+  .catch((err) => {
+    console.error('Gagal inisialisasi skema database:', err);
+    process.exit(1);
+  });
 
 module.exports = app;
