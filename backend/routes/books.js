@@ -140,7 +140,9 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
           year ? Number(year) : null,
           cover_image,
           file_path,
-          available_copies ? Number(available_copies) : 1,
+          available_copies !== undefined && available_copies !== null && available_copies !== ''
+            ? Number(available_copies)
+            : 1,
         ]
       );
       res.status(201).json({ message: 'Buku berhasil ditambahkan', data: result.rows[0] });
@@ -193,7 +195,9 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
           year ? Number(year) : existing.year,
           cover_image,
           file_path,
-          available_copies ? Number(available_copies) : existing.available_copies,
+          available_copies !== undefined && available_copies !== null && available_copies !== ''
+            ? Number(available_copies)
+            : existing.available_copies,
           req.params.id,
         ]
       );

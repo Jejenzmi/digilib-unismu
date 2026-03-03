@@ -101,8 +101,8 @@ export default function Books() {
           </div>
           <div className="pagination">
             {buildPageRange(page, totalPages).map((p) =>
-              p === '...' ? (
-                <span key={Math.random()} className="page-ellipsis">…</span>
+              typeof p === 'string' ? (
+                <span key={p} className="page-ellipsis">…</span>
               ) : (
                 <button
                   key={p}
@@ -124,11 +124,11 @@ function buildPageRange(current, total) {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages = [];
   pages.push(1);
-  if (current > 3) pages.push('...');
+  if (current > 3) pages.push('...-before');
   for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
     pages.push(p);
   }
-  if (current < total - 2) pages.push('...');
+  if (current < total - 2) pages.push('...-after');
   pages.push(total);
   return pages;
 }
