@@ -66,7 +66,7 @@ function BookCard({ book }) {
       <div className="book-cover">
         {book.cover_image ? (
           <img
-            src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/uploads/covers/${book.cover_image}`}
+            src={`${import.meta.env.VITE_API_URL?.replace('/api', '') || ''}/uploads/covers/${book.cover_image}`}
             alt={book.title}
           />
         ) : (

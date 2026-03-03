@@ -11,7 +11,7 @@ Aplikasi perpustakaan digital Universitas Muslim Indonesia (UNISMU), dibangun de
 - 📖 Peminjaman & pengembalian buku
 - 🛠️ Dashboard admin – manajemen buku, kategori, dan pengguna
 - 📁 Upload cover buku dan file PDF
-- 🗄️ Database SQLite (tidak perlu server database terpisah)
+- 🗄️ Database PostgreSQL
 
 ---
 
@@ -20,7 +20,7 @@ Aplikasi perpustakaan digital Universitas Muslim Indonesia (UNISMU), dibangun de
 | Layer    | Teknologi                              |
 |----------|----------------------------------------|
 | Frontend | React 19, React Router v7, Axios, Vite |
-| Backend  | Node.js, Express 4, better-sqlite3     |
+| Backend  | Node.js, Express 4, pg (PostgreSQL)    |
 | Auth     | JWT (jsonwebtoken), bcryptjs           |
 | Upload   | Multer 2                               |
 
@@ -30,6 +30,7 @@ Aplikasi perpustakaan digital Universitas Muslim Indonesia (UNISMU), dibangun de
 
 - Node.js ≥ 18
 - npm ≥ 9
+- PostgreSQL ≥ 14
 
 ---
 
@@ -84,15 +85,18 @@ PORT=5000
 JWT_SECRET=ganti_dengan_secret_yang_kuat
 JWT_EXPIRES_IN=7d
 NODE_ENV=development
+DATABASE_URL=postgresql://user:password@localhost:5432/digilib_unismu
 ```
 
 ## Konfigurasi Environment (Frontend)
 
-Buat file `.env.local` di root untuk mengubah URL API:
+Buat file `.env.local` di root berdasarkan `.env.example` untuk mengubah URL API (opsional saat development):
 
 ```env
 VITE_API_URL=http://localhost:5000/api
 ```
+
+> Saat development, Vite secara otomatis memproxy request `/api` dan `/uploads` ke backend (`http://localhost:5000`), sehingga variabel ini tidak wajib diisi.
 
 ---
 
