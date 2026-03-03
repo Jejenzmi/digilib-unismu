@@ -36,6 +36,14 @@ async function seed() {
   );
   console.log('✔ Admin user seeded  (email: admin@unismu.ac.id, password: admin123)');
 
+  // Seed kepala IT user
+  const kepalaItPassword = bcrypt.hashSync('admin123', 10);
+  await pool.query(
+    "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, 'kepala IT') ON CONFLICT (email) DO NOTHING",
+    ['Kepala IT', 'multimediazen@gmail.com', kepalaItPassword]
+  );
+  console.log('✔ Kepala IT user seeded (email: multimediazen@gmail.com, password: admin123)');
+
   // Seed regular user
   const userPassword = bcrypt.hashSync('user123', 10);
   await pool.query(

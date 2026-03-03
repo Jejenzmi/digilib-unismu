@@ -17,7 +17,7 @@ function authenticate(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'kepala IT') {
     return res.status(403).json({ message: 'Akses ditolak: hanya admin yang diizinkan' });
   }
   next();
