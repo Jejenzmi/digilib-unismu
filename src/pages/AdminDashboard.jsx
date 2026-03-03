@@ -33,7 +33,6 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAll();
   }, [fetchAll]);
 
@@ -77,9 +76,13 @@ export default function AdminDashboard() {
 
   async function deleteBook(id) {
     if (!confirm('Hapus buku ini?')) return;
-    await api.delete(`/books/${id}`);
-    setMessage('Buku dihapus');
-    fetchAll();
+    try {
+      await api.delete(`/books/${id}`);
+      setMessage('Buku dihapus');
+      fetchAll();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal menghapus buku');
+    }
   }
 
   async function handleCatSubmit(e) {
@@ -92,16 +95,24 @@ export default function AdminDashboard() {
 
   async function deleteCat(id) {
     if (!confirm('Hapus kategori ini?')) return;
-    await api.delete(`/categories/${id}`);
-    setMessage('Kategori dihapus');
-    fetchAll();
+    try {
+      await api.delete(`/categories/${id}`);
+      setMessage('Kategori dihapus');
+      fetchAll();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal menghapus kategori');
+    }
   }
 
   async function deleteUser(id) {
     if (!confirm('Hapus user ini?')) return;
-    await api.delete(`/users/${id}`);
-    setMessage('User dihapus');
-    fetchAll();
+    try {
+      await api.delete(`/users/${id}`);
+      setMessage('User dihapus');
+      fetchAll();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal menghapus user');
+    }
   }
 
   return (

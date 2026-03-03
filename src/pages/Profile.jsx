@@ -14,9 +14,13 @@ export default function Profile() {
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [borrowError, setBorrowError] = useState('');
 
   useEffect(() => {
-    api.get('/users/me/borrows').then(({ data }) => setBorrows(data));
+    api
+      .get('/users/me/borrows')
+      .then(({ data }) => setBorrows(data))
+      .catch(() => setBorrowError('Gagal memuat riwayat peminjaman'));
   }, []);
 
   async function handleUpdate(e) {
@@ -87,7 +91,9 @@ export default function Profile() {
 
         <div className="borrow-history">
           <h2>Riwayat Peminjaman</h2>
-          {borrows.length === 0 ? (
+          {borrowError ? (
+            <p className="error-msg">{borrowError}</p>
+          ) : borrows.length === 0 ? (
             <p>Belum ada riwayat peminjaman.</p>
           ) : (
             <table className="borrow-table">

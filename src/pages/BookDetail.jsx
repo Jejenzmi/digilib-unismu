@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -120,7 +120,7 @@ export default function BookDetail() {
 
           {!user && (
             <p className="login-prompt">
-              <a href="/login">Masuk</a> untuk meminjam buku ini.
+              <Link to="/login">Masuk</Link> untuk meminjam buku ini.
             </p>
           )}
 

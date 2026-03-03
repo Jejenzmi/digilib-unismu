@@ -4,8 +4,14 @@ import api from '../api';
 const AuthContext = createContext(null);
 
 function loadStoredUser() {
-  const stored = localStorage.getItem('user');
-  return stored ? JSON.parse(stored) : null;
+  try {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    return null;
+  }
 }
 
 export function AuthProvider({ children }) {
