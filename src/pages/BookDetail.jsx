@@ -42,7 +42,7 @@ export default function BookDetail() {
   if (loading) return <div className="loading">Memuat...</div>;
   if (!book) return null;
 
-  const coverBase = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+  const coverBase = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
   return (
     <div className="page book-detail">
