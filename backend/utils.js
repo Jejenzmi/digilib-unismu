@@ -1,6 +1,18 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
+ * Escape HTML angle bracket characters to prevent XSS.
+ * Replaces '<' and '>' with their HTML entity equivalents so no HTML tags
+ * can be injected into stored or rendered content.
+ * @param {*} str
+ * @returns {string|*} sanitized string, or the original value if not a string
+ */
+function sanitizeText(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/**
  * Validate a string field does not exceed maximum length.
  * @param {*} value
  * @param {string} fieldLabel - human-readable field name for error messages
@@ -69,4 +81,4 @@ function parseYear(value, fallback) {
   return { year: n };
 }
 
-module.exports = { EMAIL_REGEX, validateLength, parsePagination, parseId, parseAvailableCopies, parseYear };
+module.exports = { EMAIL_REGEX, sanitizeText, validateLength, parsePagination, parseId, parseAvailableCopies, parseYear };

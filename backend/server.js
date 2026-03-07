@@ -19,6 +19,14 @@ if (!process.env.JWT_SECRET) {
   console.error('Error: JWT_SECRET tidak diatur di file .env');
   process.exit(1);
 }
+const PLACEHOLDER_SECRETS = [
+  'your_jwt_secret_key_here_change_in_production',
+  'GANTI_DENGAN_STRING_ACAK_MIN_32_KARAKTER_DI_PRODUCTION',
+];
+if (PLACEHOLDER_SECRETS.includes(process.env.JWT_SECRET) || process.env.JWT_SECRET.length < 32) {
+  console.error('Error: JWT_SECRET tidak aman – gunakan string acak minimal 32 karakter (contoh: openssl rand -base64 32)');
+  process.exit(1);
+}
 if (!process.env.DATABASE_URL) {
   console.error('Error: DATABASE_URL tidak diatur di file .env');
   process.exit(1);
@@ -27,6 +35,11 @@ if (!process.env.DATABASE_URL) {
 const app = express();
 const PORT = process.env.PORT || 5000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Warn when CORS_ORIGIN is not explicitly set in production
+if (IS_PRODUCTION && !process.env.CORS_ORIGIN) {
+  console.warn('Peringatan: CORS_ORIGIN tidak diatur – menggunakan fallback http://localhost:5173. Pastikan ini benar untuk deployment production.');
+}
 
 // Middleware
 app.use(helmet());

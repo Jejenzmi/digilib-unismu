@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { parsePagination, parseId, parseAvailableCopies, parseYear, validateLength } = require('../utils');
+const { parsePagination, parseId, parseAvailableCopies, parseYear, validateLength, sanitizeText } = require('../utils');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -185,12 +185,12 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
-          title.trim(),
-          author.trim(),
-          isbn || null,
+          sanitizeText(title.trim()),
+          sanitizeText(author.trim()),
+          isbn ? sanitizeText(isbn) : null,
           category_id ? Number(category_id) : null,
-          description || null,
-          publisher || null,
+          description ? sanitizeText(description) : null,
+          publisher ? sanitizeText(publisher) : null,
           yearResult.year,
           cover_image,
           file_path,
@@ -283,12 +283,12 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
          WHERE id = $11
          RETURNING *`,
         [
-          title != null ? title.trim() : existing.title,
-          author != null ? author.trim() : existing.author,
-          isbn ?? existing.isbn,
+          title != null ? sanitizeText(title.trim()) : existing.title,
+          author != null ? sanitizeText(author.trim()) : existing.author,
+          isbn != null ? sanitizeText(isbn) : existing.isbn,
           resolvedCategoryId,
-          description ?? existing.description,
-          publisher ?? existing.publisher,
+          description != null ? sanitizeText(description) : existing.description,
+          publisher != null ? sanitizeText(publisher) : existing.publisher,
           yearResult.year,
           cover_image,
           file_path,
@@ -612,7 +612,7 @@ router.post('/:id/reviews', borrowLimiter, authenticate, async (req, res) => {
        VALUES ($1, $2, $3, $4)
        ON CONFLICT (user_id, book_id) DO UPDATE SET rating = $3, comment = $4, created_at = NOW()
        RETURNING *`,
-      [req.user.id, id, ratingNum, comment || null]
+      [req.user.id, id, ratingNum, comment ? sanitizeText(comment) : null]
     );
     res.status(201).json({ message: 'Ulasan berhasil disimpan', data: result.rows[0] });
   } catch (err) {

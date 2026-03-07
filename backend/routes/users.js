@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { EMAIL_REGEX, parsePagination, parseId, validateLength } = require('../utils');
+const { EMAIL_REGEX, parsePagination, parseId, validateLength, sanitizeText } = require('../utils');
 
 const router = express.Router();
 
@@ -57,7 +57,7 @@ router.put('/me', authenticate, async (req, res) => {
 
     const hashed = password ? bcrypt.hashSync(password, 10) : user.password;
 
-    const trimmedName = name !== undefined ? name.trim() : undefined;
+    const trimmedName = name !== undefined ? sanitizeText(name.trim()) : undefined;
     const trimmedEmail = email !== undefined ? email.trim() : undefined;
 
     const updated = await db.query(

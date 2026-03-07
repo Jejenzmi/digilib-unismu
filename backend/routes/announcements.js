@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { validateLength, parseId } = require('../utils');
+const { validateLength, parseId, sanitizeText } = require('../utils');
 const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
@@ -46,11 +46,13 @@ router.post('/', announcementLimiter, authenticate, requireAdmin, async (req, re
 
   try {
     const db = getDb();
+    const sanitizedTitle = sanitizeText(title.trim());
+    const sanitizedContent = sanitizeText(content.trim());
     const result = await db.query(
       `INSERT INTO announcements (title, content, created_by)
        VALUES ($1, $2, $3)
        RETURNING *`,
-      [title.trim(), content.trim(), req.user.id]
+      [sanitizedTitle, sanitizedContent, req.user.id]
     );
 
     // Create notifications for all users (fire-and-forget)
@@ -59,8 +61,8 @@ router.post('/', announcementLimiter, authenticate, requireAdmin, async (req, re
        SELECT id, 'announcement', $1, $2, $3
        FROM users`,
       [
-        `Pengumuman: ${title.trim()}`,
-        content.trim().length > 150 ? content.trim().slice(0, 147) + '...' : content.trim(),
+        `Pengumuman: ${sanitizedTitle}`,
+        sanitizedContent.length > 150 ? sanitizedContent.slice(0, 147) + '...' : sanitizedContent,
         result.rows[0].id,
       ]
     ).catch((err) => console.error('Announcement notification error:', err));
