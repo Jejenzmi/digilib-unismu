@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -11,19 +11,23 @@ export default function BookDetail() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    api
+  const fetchBook = useCallback(() => {
+    return api
       .get(`/books/${id}`)
       .then(({ data }) => setBook(data))
       .catch(() => navigate('/books'))
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
+  useEffect(() => {
+    fetchBook();
+  }, [fetchBook]);
+
   async function handleBorrow() {
     try {
       const { data } = await api.post(`/books/${id}/borrow`);
       setMessage(data.message);
-      setBook((b) => ({ ...b, available_copies: b.available_copies - 1 }));
+      await fetchBook();
     } catch (err) {
       setMessage(err.response?.data?.message || 'Terjadi kesalahan');
     }
@@ -33,9 +37,17 @@ export default function BookDetail() {
     try {
       const { data } = await api.post(`/books/${id}/return`);
       setMessage(data.message);
-      setBook((b) => ({ ...b, available_copies: b.available_copies + 1 }));
+      await fetchBook();
     } catch (err) {
       setMessage(err.response?.data?.message || 'Terjadi kesalahan');
+    }
+  }
+
+  function handleBack() {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/books');
     }
   }
 
@@ -46,7 +58,7 @@ export default function BookDetail() {
 
   return (
     <div className="page book-detail">
-      <button className="btn-back" onClick={() => navigate(-1)}>
+      <button className="btn-back" onClick={handleBack}>
         ← Kembali
       </button>
 
