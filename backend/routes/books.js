@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { parsePagination } = require('../utils');
+const { parsePagination, parseId, parseAvailableCopies, parseYear } = require('../utils');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -97,6 +97,8 @@ router.get('/', async (req, res) => {
 
 // GET /api/books/:id  – public
 router.get('/:id', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
   try {
     const db = getDb();
     const result = await db.query(
@@ -104,7 +106,7 @@ router.get('/:id', async (req, res) => {
        FROM books b
        LEFT JOIN categories c ON b.category_id = c.id
        WHERE b.id = $1`,
-      [req.params.id]
+      [id]
     );
     if (!result.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
     res.json(result.rows[0]);
@@ -126,6 +128,12 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Judul dan penulis wajib diisi' });
     }
 
+    const copiesResult = parseAvailableCopies(available_copies, 1);
+    if (copiesResult.error) return res.status(400).json({ message: copiesResult.error });
+
+    const yearResult = parseYear(year, null);
+    if (yearResult.error) return res.status(400).json({ message: yearResult.error });
+
     const cover_image = req.files?.cover_image?.[0]?.filename || null;
     const file_path = req.files?.file?.[0]?.filename || null;
 
@@ -142,12 +150,10 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
           category_id ? Number(category_id) : null,
           description || null,
           publisher || null,
-          year ? Number(year) : null,
+          yearResult.year,
           cover_image,
           file_path,
-          available_copies !== undefined && available_copies !== null && available_copies !== ''
-            ? Number(available_copies)
-            : 1,
+          copiesResult.copies,
         ]
       );
       res.status(201).json({ message: 'Buku berhasil ditambahkan', data: result.rows[0] });
@@ -160,12 +166,15 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
 // PUT /api/books/:id  – admin only
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
   upload(req, res, async (err) => {
     if (err) return res.status(400).json({ message: err.message });
 
     try {
       const db = getDb();
-      const existingResult = await db.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
+      const existingResult = await db.query('SELECT * FROM books WHERE id = $1', [id]);
       if (!existingResult.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
 
       const existing = existingResult.rows[0];
@@ -180,8 +189,17 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
         available_copies,
       } = req.body;
 
-      const cover_image = req.files?.cover_image?.[0]?.filename || existing.cover_image;
-      const file_path = req.files?.file?.[0]?.filename || existing.file_path;
+      const copiesResult = parseAvailableCopies(available_copies, existing.available_copies);
+      if (copiesResult.error) return res.status(400).json({ message: copiesResult.error });
+
+      const yearResult = parseYear(year, existing.year);
+      if (yearResult.error) return res.status(400).json({ message: yearResult.error });
+
+      const newCoverFilename = req.files?.cover_image?.[0]?.filename;
+      const newFileFilename = req.files?.file?.[0]?.filename;
+
+      const cover_image = newCoverFilename || existing.cover_image;
+      const file_path = newFileFilename || existing.file_path;
 
       const updated = await db.query(
         `UPDATE books SET
@@ -197,15 +215,28 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
           category_id ? Number(category_id) : existing.category_id,
           description ?? existing.description,
           publisher ?? existing.publisher,
-          year ? Number(year) : existing.year,
+          yearResult.year,
           cover_image,
           file_path,
-          available_copies !== undefined && available_copies !== null && available_copies !== ''
-            ? Number(available_copies)
-            : existing.available_copies,
-          req.params.id,
+          copiesResult.copies,
+          id,
         ]
       );
+
+      // Delete replaced files from disk
+      if (newCoverFilename && existing.cover_image) {
+        fs.unlink(
+          path.join(__dirname, '../uploads/covers', existing.cover_image),
+          (unlinkErr) => { if (unlinkErr) console.error('Failed to delete old cover:', unlinkErr); }
+        );
+      }
+      if (newFileFilename && existing.file_path) {
+        fs.unlink(
+          path.join(__dirname, '../uploads/files', existing.file_path),
+          (unlinkErr) => { if (unlinkErr) console.error('Failed to delete old file:', unlinkErr); }
+        );
+      }
+
       res.json({ message: 'Buku berhasil diperbarui', data: updated.rows[0] });
     } catch (dbErr) {
       console.error(dbErr);
@@ -216,12 +247,30 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 
 // DELETE /api/books/:id  – admin only
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
   try {
     const db = getDb();
-    const existing = await db.query('SELECT id FROM books WHERE id = $1', [req.params.id]);
+    const existing = await db.query('SELECT id, cover_image, file_path FROM books WHERE id = $1', [id]);
     if (!existing.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
 
-    await db.query('DELETE FROM books WHERE id = $1', [req.params.id]);
+    await db.query('DELETE FROM books WHERE id = $1', [id]);
+
+    // Clean up uploaded files from disk
+    const { cover_image, file_path } = existing.rows[0];
+    if (cover_image) {
+      fs.unlink(
+        path.join(__dirname, '../uploads/covers', cover_image),
+        (unlinkErr) => { if (unlinkErr) console.error('Failed to delete cover file:', unlinkErr); }
+      );
+    }
+    if (file_path) {
+      fs.unlink(
+        path.join(__dirname, '../uploads/files', file_path),
+        (unlinkErr) => { if (unlinkErr) console.error('Failed to delete book file:', unlinkErr); }
+      );
+    }
+
     res.json({ message: 'Buku berhasil dihapus' });
   } catch (err) {
     console.error(err);
@@ -231,6 +280,9 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 
 // POST /api/books/:id/borrow  – authenticated users
 router.post('/:id/borrow', authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
   const db = getDb();
   const client = await db.connect();
   let transactionStarted = false;
@@ -241,7 +293,7 @@ router.post('/:id/borrow', authenticate, async (req, res) => {
     // Lock the book row to prevent race conditions
     const bookResult = await client.query(
       'SELECT * FROM books WHERE id = $1 FOR UPDATE',
-      [req.params.id]
+      [id]
     );
     const book = bookResult.rows[0];
     if (!book) {
@@ -255,7 +307,7 @@ router.post('/:id/borrow', authenticate, async (req, res) => {
 
     const alreadyBorrowing = await client.query(
       "SELECT id FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
-      [req.user.id, req.params.id]
+      [req.user.id, id]
     );
     if (alreadyBorrowing.rows[0]) {
       await client.query('ROLLBACK');
@@ -269,11 +321,11 @@ router.post('/:id/borrow', authenticate, async (req, res) => {
       `INSERT INTO borrows (user_id, book_id, due_date)
        VALUES ($1, $2, $3)
        RETURNING *`,
-      [req.user.id, req.params.id, dueDate.toISOString()]
+      [req.user.id, id, dueDate.toISOString()]
     );
 
     await client.query('UPDATE books SET available_copies = available_copies - 1 WHERE id = $1', [
-      req.params.id,
+      id,
     ]);
 
     await client.query('COMMIT');
@@ -291,6 +343,9 @@ router.post('/:id/borrow', authenticate, async (req, res) => {
 
 // POST /api/books/:id/return  – authenticated users
 router.post('/:id/return', authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
   const db = getDb();
   const client = await db.connect();
   let transactionStarted = false;
@@ -300,7 +355,7 @@ router.post('/:id/return', authenticate, async (req, res) => {
 
     const borrowResult = await client.query(
       "SELECT * FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
-      [req.user.id, req.params.id]
+      [req.user.id, id]
     );
     const borrow = borrowResult.rows[0];
 
@@ -315,7 +370,7 @@ router.post('/:id/return', authenticate, async (req, res) => {
     );
 
     await client.query('UPDATE books SET available_copies = available_copies + 1 WHERE id = $1', [
-      req.params.id,
+      id,
     ]);
 
     await client.query('COMMIT');

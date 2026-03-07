@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { EMAIL_REGEX, parsePagination } = require('../utils');
+const { EMAIL_REGEX, parsePagination, parseId } = require('../utils');
 
 const router = express.Router();
 
@@ -145,16 +145,18 @@ router.get('/borrows', authenticate, requireAdmin, async (req, res) => {
 
 // DELETE /api/users/:id  – admin only
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID pengguna tidak valid' });
   try {
     const db = getDb();
-    const userResult = await db.query('SELECT id FROM users WHERE id = $1', [req.params.id]);
+    const userResult = await db.query('SELECT id FROM users WHERE id = $1', [id]);
     if (!userResult.rows[0]) return res.status(404).json({ message: 'User tidak ditemukan' });
 
-    if (Number(req.params.id) === req.user.id) {
+    if (id === req.user.id) {
       return res.status(400).json({ message: 'Tidak dapat menghapus akun sendiri' });
     }
 
-    await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    await db.query('DELETE FROM users WHERE id = $1', [id]);
     res.json({ message: 'User berhasil dihapus' });
   } catch (err) {
     console.error(err);
