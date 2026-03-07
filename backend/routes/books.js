@@ -48,12 +48,22 @@ const allowedMimeTypes = {
   file: ['application/pdf'],
 };
 
+const allowedExtensions = {
+  cover_image: ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
+  file: ['.pdf'],
+};
+
 const upload = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
   fileFilter: (req, file, cb) => {
-    const allowed = allowedMimeTypes[file.fieldname];
-    if (allowed && allowed.includes(file.mimetype)) {
+    const allowedMime = allowedMimeTypes[file.fieldname];
+    const allowedExt = allowedExtensions[file.fieldname];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (
+      allowedMime && allowedMime.includes(file.mimetype) &&
+      allowedExt && allowedExt.includes(ext)
+    ) {
       cb(null, true);
     } else {
       cb(new Error(`Tipe file tidak diizinkan untuk field ${file.fieldname}`));
