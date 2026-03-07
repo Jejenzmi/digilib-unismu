@@ -51,6 +51,10 @@ router.get('/', async (req, res) => {
     const { search, category_id } = req.query;
     const { page, limit, offset } = parsePagination(req.query);
 
+    if (search && search.length > 100) {
+      return res.status(400).json({ message: 'Parameter pencarian terlalu panjang (maks. 100 karakter)' });
+    }
+
     const db = getDb();
     let where = 'WHERE 1=1';
     const params = [];
@@ -226,41 +230,61 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 
 // POST /api/books/:id/borrow  – authenticated users
 router.post('/:id/borrow', authenticate, async (req, res) => {
+  const db = getDb();
+  const client = await db.connect();
+  let transactionStarted = false;
   try {
-    const db = getDb();
-    const bookResult = await db.query('SELECT * FROM books WHERE id = $1', [req.params.id]);
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    // Lock the book row to prevent race conditions
+    const bookResult = await client.query(
+      'SELECT * FROM books WHERE id = $1 FOR UPDATE',
+      [req.params.id]
+    );
     const book = bookResult.rows[0];
-    if (!book) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+    if (!book) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Buku tidak ditemukan' });
+    }
     if (book.available_copies < 1) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ message: 'Stok buku tidak tersedia' });
     }
 
-    const alreadyBorrowing = await db.query(
+    const alreadyBorrowing = await client.query(
       "SELECT id FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
       [req.user.id, req.params.id]
     );
     if (alreadyBorrowing.rows[0]) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ message: 'Anda sudah meminjam buku ini' });
     }
 
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 14); // 2-week loan
 
-    const result = await db.query(
+    const result = await client.query(
       `INSERT INTO borrows (user_id, book_id, due_date)
        VALUES ($1, $2, $3)
        RETURNING *`,
       [req.user.id, req.params.id, dueDate.toISOString()]
     );
 
-    await db.query('UPDATE books SET available_copies = available_copies - 1 WHERE id = $1', [
+    await client.query('UPDATE books SET available_copies = available_copies - 1 WHERE id = $1', [
       req.params.id,
     ]);
 
+    await client.query('COMMIT');
     res.status(201).json({ message: 'Peminjaman berhasil', data: result.rows[0] });
   } catch (err) {
+    if (transactionStarted) {
+      await client.query('ROLLBACK').catch(() => {});
+    }
     console.error(err);
     res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  } finally {
+    client.release();
   }
 });
 

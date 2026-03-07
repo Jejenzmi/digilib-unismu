@@ -3,7 +3,7 @@ const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
 });
 
 async function initSchema() {
@@ -35,7 +35,7 @@ async function initSchema() {
       year             INTEGER,
       cover_image      TEXT,
       file_path        TEXT,
-      available_copies INTEGER     NOT NULL DEFAULT 1,
+      available_copies INTEGER     NOT NULL DEFAULT 1 CHECK (available_copies >= 0),
       created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
