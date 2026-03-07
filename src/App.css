@@ -399,3 +399,139 @@ h2 { margin-bottom: 1rem; color: #2d3748; }
   .navbar { padding: 0 1rem; }
   .navbar-menu { gap: 0.75rem; }
 }
+
+/* ─── Reservation buttons & badges ─────────────────────────── */
+.btn-reserve {
+  display: inline-block;
+  background: #f6ad55;
+  color: #744210;
+  padding: 0.6rem 1.4rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-reserve:hover { background: #ed8936; color: #fff; }
+
+.btn-cancel-reserve {
+  display: inline-block;
+  background: #fed7d7;
+  color: #c53030;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-cancel-reserve:hover { background: #fc8181; color: #fff; }
+
+.reservation-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.status-badge.reservation-pending  { background: #fefcbf; color: #975a16; }
+.status-badge.reservation-available { background: #c6f6d5; color: #276749; }
+
+/* ─── Fine display ───────────────────────────────────────────── */
+.fine-amount  { color: #c53030; font-weight: 600; }
+.fine-summary {
+  background: #fff3cd;
+  border: 1px solid #f6c23e;
+  color: #856404;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.renewed-badge {
+  font-size: 0.78rem;
+  background: #e9d8fd;
+  color: #553c9a;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* ─── Admin filter bar ───────────────────────────────────────── */
+.admin-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.admin-filter-bar select {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+/* ─── Stats tab ──────────────────────────────────────────────── */
+.stats-tab { }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2.5rem;
+}
+
+.stat-number.stat-active   { color: #276749; }
+.stat-number.stat-overdue  { color: #c53030; }
+.stat-number.stat-returned { color: #2b6cb0; }
+.stat-number.stat-fine     { font-size: 1.5rem; color: #c53030; }
+
+.stats-section { margin-bottom: 2.5rem; }
+
+/* ─── Simple bar chart ───────────────────────────────────────── */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  height: 180px;
+  padding: 1rem;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+  margin-top: 1rem;
+}
+.bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+.bar-fill {
+  width: 100%;
+  background: #2b6cb0;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  transition: height 0.3s;
+  position: relative;
+}
+.bar-value {
+  font-size: 0.75rem;
+  color: #fff;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.bar-label {
+  font-size: 0.72rem;
+  color: #718096;
+  text-align: center;
+  white-space: nowrap;
+}

@@ -430,6 +430,18 @@ router.post('/:id/return', borrowLimiter, authenticate, async (req, res) => {
       id,
     ]);
 
+    // Notify the first pending reservation that the book is now available
+    await client.query(
+      `UPDATE reservations SET status = 'available'
+       WHERE id = (
+         SELECT id FROM reservations
+         WHERE book_id = $1 AND status = 'pending'
+         ORDER BY reserved_at ASC
+         LIMIT 1
+       )`,
+      [id]
+    );
+
     await client.query('COMMIT');
     res.json({ message: 'Pengembalian berhasil' });
   } catch (err) {
@@ -440,5 +452,107 @@ router.post('/:id/return', borrowLimiter, authenticate, async (req, res) => {
     res.status(500).json({ message: 'Terjadi kesalahan pada server' });
   } finally {
     client.release();
+  }
+});
+
+// POST /api/books/:id/reserve  – authenticated users, join waitlist
+router.post('/:id/reserve', borrowLimiter, authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
+  const db = getDb();
+  try {
+    const bookResult = await db.query('SELECT id, available_copies FROM books WHERE id = $1', [id]);
+    if (!bookResult.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+
+    if (bookResult.rows[0].available_copies > 0) {
+      return res.status(400).json({ message: 'Buku masih tersedia, silakan langsung pinjam' });
+    }
+
+    // Check if user is already borrowing this book
+    const alreadyBorrowing = await db.query(
+      "SELECT id FROM borrows WHERE user_id = $1 AND book_id = $2 AND status IN ('borrowed', 'overdue')",
+      [req.user.id, id]
+    );
+    if (alreadyBorrowing.rows[0]) {
+      return res.status(400).json({ message: 'Anda sudah meminjam buku ini' });
+    }
+
+    // Upsert reservation (insert or update status back to pending if cancelled before)
+    const result = await db.query(
+      `INSERT INTO reservations (user_id, book_id, status)
+       VALUES ($1, $2, 'pending')
+       ON CONFLICT (user_id, book_id)
+       DO UPDATE SET status = 'pending', reserved_at = NOW()
+       WHERE reservations.status = 'cancelled'
+       RETURNING *`,
+      [req.user.id, id]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(400).json({ message: 'Anda sudah berada dalam antrian untuk buku ini' });
+    }
+
+    res.status(201).json({ message: 'Berhasil masuk antrian peminjaman', data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// DELETE /api/books/:id/reserve  – authenticated users, cancel reservation
+router.delete('/:id/reserve', borrowLimiter, authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
+  const db = getDb();
+  try {
+    const result = await db.query(
+      "UPDATE reservations SET status = 'cancelled' WHERE user_id = $1 AND book_id = $2 AND status IN ('pending','available') RETURNING id",
+      [req.user.id, id]
+    );
+    if (!result.rows[0]) {
+      return res.status(404).json({ message: 'Tidak ada antrian aktif untuk buku ini' });
+    }
+    res.json({ message: 'Antrian berhasil dibatalkan' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// POST /api/books/:id/renew  – authenticated users, extend due date by 14 days (max 1 renewal)
+router.post('/:id/renew', borrowLimiter, authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
+  const db = getDb();
+  try {
+    const borrowResult = await db.query(
+      "SELECT * FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
+      [req.user.id, id]
+    );
+    const borrow = borrowResult.rows[0];
+
+    if (!borrow) {
+      return res.status(400).json({ message: 'Tidak ada peminjaman aktif untuk buku ini, atau buku sudah melewati jatuh tempo (tidak dapat diperpanjang)' });
+    }
+
+    if (borrow.renewal_count >= 1) {
+      return res.status(400).json({ message: 'Peminjaman hanya dapat diperpanjang 1 kali' });
+    }
+
+    const newDueDate = new Date(borrow.due_date);
+    newDueDate.setDate(newDueDate.getDate() + 14);
+
+    const updated = await db.query(
+      "UPDATE borrows SET due_date = $1, renewal_count = renewal_count + 1 WHERE id = $2 RETURNING *",
+      [newDueDate.toISOString(), borrow.id]
+    );
+
+    res.json({ message: 'Peminjaman berhasil diperpanjang 14 hari', data: updated.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
   }
 });

@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [borrowPage, setBorrowPage] = useState(1);
   const [borrowStatus, setBorrowStatus] = useState('');
   const [tab, setTab] = useState('books');
+  const [stats, setStats] = useState(null);
   const [bookForm, setBookForm] = useState({
     title: '',
     author: '',
@@ -91,6 +92,15 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchStats = useCallback(async () => {
+    try {
+      const { data } = await api.get('/stats');
+      setStats(data);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal memuat statistik');
+    }
+  }, []);
+
   useEffect(() => {
     async function load() {
       await fetchAll();
@@ -105,10 +115,13 @@ export default function AdminDashboard() {
       }
       load();
     }
+    if (tab === 'stats') {
+      fetchStats();
+    }
     // borrowStatus intentionally omitted: status changes are handled directly
     // by the onChange handler which calls fetchBorrows itself
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, fetchBorrows]);
+  }, [tab, fetchBorrows, fetchStats]);
 
   async function handleBookSubmit(e) {
     e.preventDefault();
@@ -228,7 +241,7 @@ export default function AdminDashboard() {
       {message && <div className="alert">{message}</div>}
 
       <div className="tab-bar">
-        {['books', 'categories', 'users', 'borrows'].map((t) => (
+        {['books', 'categories', 'users', 'borrows', 'stats'].map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -240,7 +253,9 @@ export default function AdminDashboard() {
               ? 'Kategori'
               : t === 'users'
               ? 'Pengguna'
-              : 'Peminjaman'}
+              : t === 'borrows'
+              ? 'Peminjaman'
+              : 'Statistik'}
           </button>
         ))}
       </div>
@@ -597,6 +612,7 @@ export default function AdminDashboard() {
                 <th>Jatuh Tempo</th>
                 <th>Tgl Kembali</th>
                 <th>Status</th>
+                <th>Denda</th>
               </tr>
             </thead>
             <tbody>
@@ -616,11 +632,18 @@ export default function AdminDashboard() {
                   <td>
                     <span className={`status-badge ${b.status}`}>{b.status}</span>
                   </td>
+                  <td>
+                    {b.fine_amount > 0 ? (
+                      <span className="fine-amount">Rp{b.fine_amount.toLocaleString('id-ID')}</span>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
                 </tr>
               ))}
               {borrows.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center' }}>Tidak ada data peminjaman.</td>
+                  <td colSpan={7} style={{ textAlign: 'center' }}>Tidak ada data peminjaman.</td>
                 </tr>
               )}
             </tbody>
@@ -639,6 +662,100 @@ export default function AdminDashboard() {
             </div>
           )}
         </>
+      )}
+      {tab === 'stats' && (
+        <div className="stats-tab">
+          {!stats ? (
+            <div className="loading">Memuat statistik...</div>
+          ) : (
+            <>
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <span className="stat-number">{stats.total_books}</span>
+                  <span className="stat-label">Total Buku</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-number">{stats.total_categories}</span>
+                  <span className="stat-label">Kategori</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-number">{stats.total_users}</span>
+                  <span className="stat-label">Pengguna</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-number">{stats.total_borrows}</span>
+                  <span className="stat-label">Total Peminjaman</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-number stat-active">{stats.active_borrows}</span>
+                  <span className="stat-label">Sedang Dipinjam</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-number stat-overdue">{stats.overdue_borrows}</span>
+                  <span className="stat-label">Terlambat</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-number stat-returned">{stats.returned_borrows}</span>
+                  <span className="stat-label">Dikembalikan</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-number stat-fine">
+                    Rp{stats.total_fines.toLocaleString('id-ID')}
+                  </span>
+                  <span className="stat-label">Total Akumulasi Denda</span>
+                </div>
+              </div>
+
+              {stats.top_books.length > 0 && (
+                <div className="stats-section">
+                  <h2>📚 Buku Terpopuler</h2>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Judul</th>
+                        <th>Penulis</th>
+                        <th>Jumlah Dipinjam</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.top_books.map((book, idx) => (
+                        <tr key={book.id}>
+                          <td>{idx + 1}</td>
+                          <td>
+                            <Link to={`/books/${book.id}`}>{book.title}</Link>
+                          </td>
+                          <td>{book.author}</td>
+                          <td>{book.borrow_count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {stats.borrows_by_month.length > 0 && (
+                <div className="stats-section">
+                  <h2>📅 Peminjaman 6 Bulan Terakhir</h2>
+                  <div className="bar-chart">
+                    {stats.borrows_by_month.map((item) => {
+                      const maxCount = Math.max(...stats.borrows_by_month.map((i) => i.count), 1);
+                      const heightPct = Math.round((item.count / maxCount) * 100);
+                      return (
+                        <div key={item.month} className="bar-item">
+                          <div className="bar-fill" style={{ height: `${heightPct}%` }}>
+                            <span className="bar-value">{item.count}</span>
+                          </div>
+                          <span className="bar-label">{item.month}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       )}
     </div>
   );

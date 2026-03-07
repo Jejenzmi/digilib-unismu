@@ -11,6 +11,7 @@ export default function BookDetail() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [isBorrowing, setIsBorrowing] = useState(false);
+  const [reservation, setReservation] = useState(null); // null | { status }
 
   const fetchBook = useCallback(() => {
     return api
@@ -33,18 +34,35 @@ export default function BookDetail() {
       .catch((err) => console.error('Gagal memuat status peminjaman:', err));
   }, [id, user]);
 
+  const fetchReservation = useCallback(() => {
+    if (!user) return;
+    api
+      .get('/users/me/reservations')
+      .then(({ data }) => {
+        const res = data.find((r) => String(r.book_id) === String(id));
+        setReservation(res || null);
+      })
+      .catch((err) => console.error('Gagal memuat status antrian:', err));
+  }, [id, user]);
+
   useEffect(() => {
     fetchBook();
   }, [fetchBook]);
 
   useEffect(() => {
     fetchBorrowStatus();
-  }, [fetchBorrowStatus]);
+    fetchReservation();
+  }, [fetchBorrowStatus, fetchReservation]);
 
   async function handleBorrow() {
     try {
       const { data } = await api.post(`/books/${id}/borrow`);
       setMessage(data.message);
+      // Auto-cancel reservation if user had one
+      if (reservation) {
+        await api.delete(`/books/${id}/reserve`).catch(() => {});
+        setReservation(null);
+      }
       await fetchBook();
       fetchBorrowStatus();
     } catch (err) {
@@ -58,6 +76,26 @@ export default function BookDetail() {
       setMessage(data.message);
       await fetchBook();
       fetchBorrowStatus();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Terjadi kesalahan');
+    }
+  }
+
+  async function handleReserve() {
+    try {
+      const { data } = await api.post(`/books/${id}/reserve`);
+      setMessage(data.message);
+      fetchReservation();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Terjadi kesalahan');
+    }
+  }
+
+  async function handleCancelReservation() {
+    try {
+      const { data } = await api.delete(`/books/${id}/reserve`);
+      setMessage(data.message);
+      setReservation(null);
     } catch (err) {
       setMessage(err.response?.data?.message || 'Terjadi kesalahan');
     }
@@ -137,12 +175,8 @@ export default function BookDetail() {
 
           {user && (
             <div className="book-actions">
-              {!isBorrowing && (
-                <button
-                  onClick={handleBorrow}
-                  disabled={book.available_copies < 1}
-                  className="btn-primary"
-                >
+              {!isBorrowing && book.available_copies > 0 && (
+                <button onClick={handleBorrow} className="btn-primary">
                   Pinjam Buku
                 </button>
               )}
@@ -150,6 +184,30 @@ export default function BookDetail() {
                 <button onClick={handleReturn} className="btn-secondary">
                   Kembalikan Buku
                 </button>
+              )}
+              {!isBorrowing && book.available_copies < 1 && !reservation && (
+                <button onClick={handleReserve} className="btn-reserve">
+                  🔔 Antri / Reservasi
+                </button>
+              )}
+              {!isBorrowing && reservation && reservation.status === 'pending' && (
+                <div className="reservation-info">
+                  <span className="status-badge reservation-pending">⏳ Dalam Antrian</span>
+                  <button onClick={handleCancelReservation} className="btn-cancel-reserve">
+                    Batalkan Antrian
+                  </button>
+                </div>
+              )}
+              {!isBorrowing && reservation && reservation.status === 'available' && (
+                <div className="reservation-info">
+                  <span className="status-badge reservation-available">✅ Buku Tersedia untuk Anda!</span>
+                  <button onClick={handleBorrow} className="btn-primary">
+                    Pinjam Sekarang
+                  </button>
+                  <button onClick={handleCancelReservation} className="btn-cancel-reserve">
+                    Batalkan
+                  </button>
+                </div>
               )}
             </div>
           )}

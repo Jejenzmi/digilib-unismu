@@ -41,14 +41,29 @@ async function initSchema() {
     );
 
     CREATE TABLE IF NOT EXISTS borrows (
+      id            SERIAL PRIMARY KEY,
+      user_id       INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      book_id       INTEGER     NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+      borrow_date   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      due_date      TIMESTAMPTZ NOT NULL,
+      return_date   TIMESTAMPTZ,
+      status        TEXT        NOT NULL DEFAULT 'borrowed' CHECK(status IN ('borrowed','returned','overdue')),
+      renewal_count INTEGER     NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS reservations (
       id          SERIAL PRIMARY KEY,
       user_id     INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       book_id     INTEGER     NOT NULL REFERENCES books(id) ON DELETE CASCADE,
-      borrow_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      due_date    TIMESTAMPTZ NOT NULL,
-      return_date TIMESTAMPTZ,
-      status      TEXT        NOT NULL DEFAULT 'borrowed' CHECK(status IN ('borrowed','returned','overdue'))
+      reserved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      status      TEXT        NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','available','cancelled')),
+      UNIQUE(user_id, book_id)
     );
+  `);
+
+  // Add renewal_count column to existing borrows tables (idempotent migration)
+  await pool.query(`
+    ALTER TABLE borrows ADD COLUMN IF NOT EXISTS renewal_count INTEGER NOT NULL DEFAULT 0;
   `);
 }
 
