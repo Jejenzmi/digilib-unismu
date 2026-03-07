@@ -10,6 +10,7 @@ export default function BookDetail() {
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [isBorrowing, setIsBorrowing] = useState(false);
 
   const fetchBook = useCallback(() => {
     return api
@@ -19,15 +20,33 @@ export default function BookDetail() {
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
+  const fetchBorrowStatus = useCallback(() => {
+    if (!user) return;
+    api
+      .get('/users/me/borrows')
+      .then(({ data }) => {
+        const active = data.some(
+          (b) => String(b.book_id) === String(id) && (b.status === 'borrowed' || b.status === 'overdue')
+        );
+        setIsBorrowing(active);
+      })
+      .catch((err) => console.error('Gagal memuat status peminjaman:', err));
+  }, [id, user]);
+
   useEffect(() => {
     fetchBook();
   }, [fetchBook]);
+
+  useEffect(() => {
+    fetchBorrowStatus();
+  }, [fetchBorrowStatus]);
 
   async function handleBorrow() {
     try {
       const { data } = await api.post(`/books/${id}/borrow`);
       setMessage(data.message);
       await fetchBook();
+      fetchBorrowStatus();
     } catch (err) {
       setMessage(err.response?.data?.message || 'Terjadi kesalahan');
     }
@@ -38,6 +57,7 @@ export default function BookDetail() {
       const { data } = await api.post(`/books/${id}/return`);
       setMessage(data.message);
       await fetchBook();
+      fetchBorrowStatus();
     } catch (err) {
       setMessage(err.response?.data?.message || 'Terjadi kesalahan');
     }
@@ -117,16 +137,20 @@ export default function BookDetail() {
 
           {user && (
             <div className="book-actions">
-              <button
-                onClick={handleBorrow}
-                disabled={book.available_copies < 1}
-                className="btn-primary"
-              >
-                Pinjam Buku
-              </button>
-              <button onClick={handleReturn} className="btn-secondary">
-                Kembalikan Buku
-              </button>
+              {!isBorrowing && (
+                <button
+                  onClick={handleBorrow}
+                  disabled={book.available_copies < 1}
+                  className="btn-primary"
+                >
+                  Pinjam Buku
+                </button>
+              )}
+              {isBorrowing && (
+                <button onClick={handleReturn} className="btn-secondary">
+                  Kembalikan Buku
+                </button>
+              )}
             </div>
           )}
 

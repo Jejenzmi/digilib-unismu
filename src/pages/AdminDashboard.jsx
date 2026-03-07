@@ -5,6 +5,7 @@ import { isAdminRole } from '../utils/roles';
 
 export default function AdminDashboard() {
   const [books, setBooks] = useState([]);
+  const [bookTotal, setBookTotal] = useState(0);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
   const [tab, setTab] = useState('books');
@@ -30,9 +31,10 @@ export default function AdminDashboard() {
       const [bRes, cRes, uRes] = await Promise.all([
         api.get('/books?limit=100'),
         api.get('/categories'),
-        api.get('/users'),
+        api.get('/users?limit=100'),
       ]);
       setBooks(bRes.data.data);
+      setBookTotal(bRes.data.total);
       setCategories(cRes.data);
       setUsers(uRes.data.data);
     } catch (err) {
@@ -258,7 +260,15 @@ export default function AdminDashboard() {
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      if (file && file.size > 20 * 1024 * 1024) {
+                        setMessage('Ukuran foto sampul melebihi batas 20 MB');
+                        e.target.value = '';
+                        return;
+                      }
+                      setCoverFile(file);
+                    }}
                   />
                 </div>
                 <div className="form-group">
@@ -266,7 +276,15 @@ export default function AdminDashboard() {
                   <input
                     type="file"
                     accept="application/pdf"
-                    onChange={(e) => setBookFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      if (file && file.size > 20 * 1024 * 1024) {
+                        setMessage('Ukuran file PDF melebihi batas 20 MB');
+                        e.target.value = '';
+                        return;
+                      }
+                      setBookFile(file);
+                    }}
                   />
                 </div>
               </div>
@@ -295,7 +313,7 @@ export default function AdminDashboard() {
             </form>
           </div>
 
-          <h2>Daftar Buku ({books.length})</h2>
+          <h2>Daftar Buku ({bookTotal > books.length ? `${books.length} dari ${bookTotal}` : books.length})</h2>
           <table className="admin-table">
             <thead>
               <tr>

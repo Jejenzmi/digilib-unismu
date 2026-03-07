@@ -5,6 +5,7 @@ import api from '../api';
 export default function Home() {
   const [stats, setStats] = useState({ books: 0, categories: 0 });
   const [recentBooks, setRecentBooks] = useState([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -15,8 +16,8 @@ export default function Home() {
         ]);
         setRecentBooks(booksRes.data.data);
         setStats({ books: booksRes.data.total, categories: catsRes.data.length });
-      } catch {
-        // ignore
+      } catch (err) {
+        setError(err.response?.data?.message || 'Gagal memuat data. Silakan coba lagi.');
       }
     }
     loadData();
@@ -24,6 +25,7 @@ export default function Home() {
 
   return (
     <div className="page">
+      {error && <div className="error-msg">{error}</div>}
       <section className="hero">
         <h1>Perpustakaan Digital UNISMU</h1>
         <p>Temukan ribuan koleksi buku ilmiah, referensi, dan karya akademik.</p>
