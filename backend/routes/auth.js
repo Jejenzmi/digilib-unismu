@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getDb } = require('../database/db');
-const { EMAIL_REGEX, validateLength } = require('../utils');
+const { EMAIL_REGEX, validateLength, sanitizeText } = require('../utils');
 
 const router = express.Router();
 
@@ -31,7 +31,7 @@ router.post('/register', async (req, res) => {
 
   try {
     const db = getDb();
-    const trimmedName = name.trim();
+    const trimmedName = sanitizeText(name.trim());
     const trimmedEmail = email.trim();
     const existing = await db.query('SELECT id FROM users WHERE email = $1', [trimmedEmail]);
     if (existing.rows[0]) {
@@ -46,7 +46,7 @@ router.post('/register', async (req, res) => {
 
     const userId = result.rows[0].id;
     const token = jwt.sign(
-      { id: userId, email: trimmedEmail, role: 'user' },
+      { id: userId, role: 'user' },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -81,7 +81,7 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
+      { id: user.id, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );

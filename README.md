@@ -64,12 +64,14 @@ npm run dev
 
 Server berjalan di **http://localhost:5000**
 
-**Akun bawaan setelah seeding:**
+**Akun bawaan setelah seeding (hanya untuk development):**
 
 | Role  | Email                       | Password  |
 |-------|-----------------------------|-----------|
 | Admin | admin@unismu.ac.id          | admin123  |
 | User  | mahasiswa@unismu.ac.id      | user123   |
+
+> ⚠️ **Jangan jalankan `npm run seed` di lingkungan production.** Akun-akun di atas menggunakan password yang lemah dan bersifat publik. Jika seed sudah pernah dijalankan di production, segera ganti password semua akun tersebut dari dashboard admin.
 
 ### 2. Frontend
 
@@ -201,3 +203,32 @@ Dokumen tersebut mencakup:
 - Diagram workflow lengkap untuk setiap proses utama
 - Kebijakan sistem (durasi pinjam, denda, batas file, dll.)
 
+
+---
+
+## Checklist Production Deployment
+
+Sebelum go-live, pastikan semua item berikut sudah terpenuhi:
+
+### Konfigurasi Wajib
+- [ ] `JWT_SECRET` diisi dengan string acak minimal 32 karakter (`openssl rand -base64 32`)
+- [ ] `NODE_ENV=production` diatur di file `.env`
+- [ ] `DATABASE_URL` mengarah ke database production (bukan localhost)
+- [ ] `CORS_ORIGIN` diisi dengan domain production (mis. `https://digilib.unismu.ac.id`)
+- [ ] File `.env` **tidak** di-commit ke repository (sudah ada di `.gitignore`)
+
+### Keamanan
+- [ ] **Jangan** jalankan `npm run seed` di production
+- [ ] Jika seed pernah dijalankan, ganti password akun `admin@unismu.ac.id` dan akun lainnya
+- [ ] Aktifkan SSL/TLS (HTTPS) untuk semua koneksi
+- [ ] Pastikan folder `uploads/` tidak dapat di-list secara publik (directory listing dinonaktifkan)
+
+### Build & Deploy
+- [ ] Jalankan `npm run build` di root project untuk membangun frontend
+- [ ] Jalankan `npm start` di folder `backend/` untuk menjalankan server production
+- [ ] Pastikan proses Node.js dijalankan melalui process manager (mis. PM2, systemd)
+
+### Pasca-Deploy
+- [ ] Periksa endpoint `/api/health` mengembalikan `{ "status": "ok" }`
+- [ ] Login sebagai admin dan verifikasi semua fitur berjalan normal
+- [ ] Atur backup rutin untuk database PostgreSQL

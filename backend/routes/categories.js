@@ -1,7 +1,7 @@
 const express = require('express');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { parseId, validateLength } = require('../utils');
+const { parseId, validateLength, sanitizeText } = require('../utils');
 
 const router = express.Router();
 
@@ -43,7 +43,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
   const { name, description } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ message: 'Nama kategori wajib diisi' });
 
-  const trimmedName = name.trim();
+  const trimmedName = sanitizeText(name.trim());
   const nameLenErr = validateLength(trimmedName, 'Nama kategori', 100);
   if (nameLenErr) return res.status(400).json({ message: nameLenErr });
 
@@ -57,7 +57,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
     const result = await db.query(
       'INSERT INTO categories (name, description) VALUES ($1, $2) RETURNING *',
-      [trimmedName, description || null]
+      [trimmedName, description ? sanitizeText(description) : null]
     );
     res.status(201).json({ message: 'Kategori berhasil ditambahkan', data: result.rows[0] });
   } catch (err) {
@@ -99,7 +99,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 
     const result = await db.query(
       'UPDATE categories SET name = $1, description = $2 WHERE id = $3 RETURNING *',
-      [name !== undefined ? name.trim() : row.name, description ?? row.description, id]
+      [name !== undefined ? sanitizeText(name.trim()) : row.name, description !== undefined ? sanitizeText(description) : row.description, id]
     );
     res.json({ message: 'Kategori berhasil diperbarui', data: result.rows[0] });
   } catch (err) {
