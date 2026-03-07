@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 
 const router = express.Router();
 
@@ -374,11 +375,17 @@ router.post('/:id/borrow', borrowLimiter, authenticate, async (req, res) => {
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 14); // 2-week loan
 
+    // Generate a reading token that expires exactly at due_date
+    const readingToken = jwt.sign(
+      { userId: req.user.id, bookId: id, type: 'reading', exp: Math.floor(dueDate.getTime() / 1000) },
+      process.env.JWT_SECRET
+    );
+
     const result = await client.query(
-      `INSERT INTO borrows (user_id, book_id, due_date)
-       VALUES ($1, $2, $3)
+      `INSERT INTO borrows (user_id, book_id, due_date, reading_token)
+       VALUES ($1, $2, $3, $4)
        RETURNING *`,
-      [req.user.id, id, dueDate.toISOString()]
+      [req.user.id, id, dueDate.toISOString(), readingToken]
     );
 
     await client.query('UPDATE books SET available_copies = available_copies - 1 WHERE id = $1', [
@@ -662,6 +669,57 @@ router.delete('/:id/wishlist', borrowLimiter, authenticate, async (req, res) => 
   }
 });
 
+// GET /api/books/:id/read  – serve book PDF using a time-limited reading token
+router.get('/:id/read', borrowLimiter, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
+  const { token } = req.query;
+  if (!token) return res.status(401).json({ message: 'Token baca tidak ditemukan' });
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    return res.status(401).json({ message: 'Token baca tidak valid atau sudah kedaluwarsa' });
+  }
+
+  if (decoded.type !== 'reading' || Number(decoded.bookId) !== id || !decoded.userId) {
+    return res.status(403).json({ message: 'Token baca tidak valid untuk buku ini' });
+  }
+
+  const db = getDb();
+  try {
+    // Verify the borrow is still active and the token matches exactly
+    const borrowResult = await db.query(
+      "SELECT * FROM borrows WHERE user_id = $1 AND book_id = $2 AND status IN ('borrowed', 'overdue') AND reading_token = $3",
+      [decoded.userId, id, token]
+    );
+    if (!borrowResult.rows[0]) {
+      return res.status(403).json({ message: 'Akses ditolak: peminjaman tidak aktif atau token tidak cocok' });
+    }
+
+    const bookResult = await db.query('SELECT file_path FROM books WHERE id = $1', [id]);
+    const book = bookResult.rows[0];
+    if (!book || !book.file_path) {
+      return res.status(404).json({ message: 'File buku tidak tersedia' });
+    }
+
+    const filePath = path.join(__dirname, '../uploads/files', path.basename(book.file_path));
+    res.sendFile(filePath, { headers: { 'Content-Type': 'application/pdf' } }, (err) => {
+      if (err) {
+        console.error('Gagal mengirim file buku:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Gagal membuka file buku' });
+        }
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
 // POST /api/books/:id/renew  – authenticated users, extend due date by 14 days (max 1 renewal)
 router.post('/:id/renew', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);
@@ -686,9 +744,15 @@ router.post('/:id/renew', borrowLimiter, authenticate, async (req, res) => {
     const newDueDate = new Date(borrow.due_date);
     newDueDate.setDate(newDueDate.getDate() + 14);
 
+    // Re-generate reading token with the extended due_date as expiry
+    const newReadingToken = jwt.sign(
+      { userId: req.user.id, bookId: id, type: 'reading', exp: Math.floor(newDueDate.getTime() / 1000) },
+      process.env.JWT_SECRET
+    );
+
     const updated = await db.query(
-      "UPDATE borrows SET due_date = $1, renewal_count = renewal_count + 1 WHERE id = $2 RETURNING *",
-      [newDueDate.toISOString(), borrow.id]
+      "UPDATE borrows SET due_date = $1, renewal_count = renewal_count + 1, reading_token = $2 WHERE id = $3 RETURNING *",
+      [newDueDate.toISOString(), newReadingToken, borrow.id]
     );
 
     res.json({ message: 'Peminjaman berhasil diperpanjang 14 hari', data: updated.rows[0] });
