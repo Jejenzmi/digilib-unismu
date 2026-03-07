@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 
@@ -24,8 +26,11 @@ if (!process.env.DATABASE_URL) {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Middleware
+app.use(helmet());
+app.use(compression());
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
@@ -70,10 +75,20 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Digilib UNISMU API is running' });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ message: 'Endpoint tidak ditemukan' });
-});
+// Serve React frontend in production
+if (IS_PRODUCTION) {
+  const distPath = path.join(__dirname, '../dist');
+  app.use(express.static(distPath));
+  // SPA fallback: non-API routes → index.html
+  app.get(/^(?!\/api\/).*/, (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+} else {
+  // 404 handler for development
+  app.use((req, res) => {
+    res.status(404).json({ message: 'Endpoint tidak ditemukan' });
+  });
+}
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars
