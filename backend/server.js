@@ -10,6 +10,15 @@ const booksRoutes = require('./routes/books');
 const categoriesRoutes = require('./routes/categories');
 const usersRoutes = require('./routes/users');
 
+if (!process.env.JWT_SECRET) {
+  console.error('Error: JWT_SECRET tidak diatur di file .env');
+  process.exit(1);
+}
+if (!process.env.DATABASE_URL) {
+  console.error('Error: DATABASE_URL tidak diatur di file .env');
+  process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 

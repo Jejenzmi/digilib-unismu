@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { isAdminRole } from '../utils/roles';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -20,7 +21,7 @@ export default function Navbar() {
         <Link to="/books">Koleksi Buku</Link>
         {user ? (
           <>
-            {user.role === 'admin' && <Link to="/admin">Admin</Link>}
+            {isAdminRole(user.role) && <Link to="/admin">Admin</Link>}
             <Link to="/profile">Profil</Link>
             <button onClick={handleLogout} className="btn-logout">
               Keluar
