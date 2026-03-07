@@ -9,6 +9,7 @@ export default function Profile() {
   const [borrows, setBorrows] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [wishlist, setWishlist] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -46,7 +47,10 @@ export default function Profile() {
   useEffect(() => {
     api
       .get('/users/me')
-      .then(({ data }) => setForm((prev) => ({ ...prev, name: data.name, email: data.email })))
+      .then(({ data }) => {
+        setProfile(data);
+        setForm((prev) => ({ ...prev, name: data.name, email: data.email }));
+      })
       .catch(() => setProfileError('Gagal memuat data profil. Silakan muat ulang halaman.'));
     loadBorrows();
     loadReservations();
@@ -62,6 +66,7 @@ export default function Profile() {
       if (form.password) payload.password = form.password;
       const { data } = await api.put('/users/me', payload);
       updateUser(data.data);
+      setProfile(data.data);
       setForm((prev) => ({ ...prev, password: '' }));
       setMessage('Profil berhasil diperbarui');
     } catch (err) {
@@ -112,7 +117,8 @@ export default function Profile() {
       <h1>Profil Saya</h1>
 
       <div className="profile-grid">
-        <div className="profile-form">
+        <div className="profile-left-col">
+          <div className="profile-form">
           <h2>Edit Profil</h2>
           {profileError && <div className="error-msg">{profileError}</div>}
           {message && <div className="alert success">{message}</div>}
@@ -154,6 +160,53 @@ export default function Profile() {
             Keluar
           </button>
         </div>
+
+        {/* Digital Member Card */}
+        {profile && (
+          <div className="member-card-wrapper">
+            <h2>🪪 Kartu Member Digital</h2>
+            <div className="member-card">
+              <div className="member-card-header">
+                <span className="member-card-logo">📚</span>
+                <div>
+                  <div className="member-card-libname">Digilib UNISMU</div>
+                  <div className="member-card-subtitle">Kartu Anggota Digital</div>
+                </div>
+              </div>
+              <div className="member-card-avatar">
+                {profile.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="member-card-name">{profile.name}</div>
+              <div className="member-card-id">
+                ID: MBR-{String(profile.id).padStart(4, '0').slice(-4)}
+              </div>
+              <div className="member-card-detail">
+                <span className="member-card-label">Email</span>
+                <span className="member-card-value">{profile.email}</span>
+              </div>
+              <div className="member-card-detail">
+                <span className="member-card-label">Peran</span>
+                <span className="member-card-role-badge">{profile.role}</span>
+              </div>
+              <div className="member-card-detail">
+                <span className="member-card-label">Anggota Sejak</span>
+                <span className="member-card-value">
+                  {new Date(profile.created_at).toLocaleDateString('id-ID', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </span>
+              </div>
+              <div className="member-card-footer">
+                <span>✓ Aktif</span>
+                <span>Universitas Muhammadiyah Sidenreng Rappang</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        </div>{/* end profile-left-col */}
 
         <div className="borrow-history">
           {reservationError && reservations.length === 0 && (
