@@ -29,20 +29,50 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState('');
   const [coverFile, setCoverFile] = useState(null);
   const [bookFile, setBookFile] = useState(null);
+  const [bookPage, setBookPage] = useState(1);
+  const [userTotal, setUserTotal] = useState(0);
+  const [userPage, setUserPage] = useState(1);
 
+  const BOOK_ADMIN_LIMIT = 20;
+  const USER_ADMIN_LIMIT = 20;
   const BORROW_LIMIT = 20;
+
+  const fetchAdminBooks = useCallback(async (page = 1) => {
+    try {
+      const { data } = await api.get('/books', { params: { page, limit: BOOK_ADMIN_LIMIT } });
+      setBooks(data.data);
+      setBookTotal(data.total);
+      setBookPage(page);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal memuat data buku');
+    }
+  }, []);
+
+  const fetchAdminUsers = useCallback(async (page = 1) => {
+    try {
+      const { data } = await api.get('/users', { params: { page, limit: USER_ADMIN_LIMIT } });
+      setUsers(data.data);
+      setUserTotal(data.total);
+      setUserPage(page);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal memuat data pengguna');
+    }
+  }, []);
 
   const fetchAll = useCallback(async () => {
     try {
       const [bRes, cRes, uRes] = await Promise.all([
-        api.get('/books?limit=100'),
+        api.get('/books', { params: { page: 1, limit: BOOK_ADMIN_LIMIT } }),
         api.get('/categories'),
-        api.get('/users?limit=100'),
+        api.get('/users', { params: { page: 1, limit: USER_ADMIN_LIMIT } }),
       ]);
       setBooks(bRes.data.data);
       setBookTotal(bRes.data.total);
+      setBookPage(1);
       setCategories(cRes.data);
       setUsers(uRes.data.data);
+      setUserTotal(uRes.data.total);
+      setUserPage(1);
     } catch (err) {
       setMessage(err.response?.data?.message || 'Gagal memuat data');
     }
@@ -139,7 +169,10 @@ export default function AdminDashboard() {
     try {
       await api.delete(`/books/${id}`);
       setMessage('Buku dihapus');
-      fetchAll();
+      // After deletion, stay on current page (go to page-1 if current page is now empty)
+      const remainingOnPage = books.length - 1;
+      const targetPage = remainingOnPage === 0 && bookPage > 1 ? bookPage - 1 : bookPage;
+      fetchAdminBooks(targetPage);
     } catch (err) {
       setMessage(err.response?.data?.message || 'Gagal menghapus buku');
     }
@@ -180,7 +213,10 @@ export default function AdminDashboard() {
     try {
       await api.delete(`/users/${id}`);
       setMessage('User dihapus');
-      fetchAll();
+      // Stay on current page (go to page-1 if current page is now empty)
+      const remainingOnPage = users.length - 1;
+      const targetPage = remainingOnPage === 0 && userPage > 1 ? userPage - 1 : userPage;
+      fetchAdminUsers(targetPage);
     } catch (err) {
       setMessage(err.response?.data?.message || 'Gagal menghapus user');
     }
@@ -350,7 +386,7 @@ export default function AdminDashboard() {
             </form>
           </div>
 
-          <h2>Daftar Buku ({bookTotal > books.length ? `${books.length} dari ${bookTotal}` : books.length})</h2>
+          <h2>Daftar Buku ({bookTotal})</h2>
           <table className="admin-table">
             <thead>
               <tr>
@@ -382,6 +418,23 @@ export default function AdminDashboard() {
               ))}
             </tbody>
           </table>
+          {bookTotal > BOOK_ADMIN_LIMIT && (
+            <div className="pagination">
+              {buildPageRange(bookPage, Math.ceil(bookTotal / BOOK_ADMIN_LIMIT)).map((p) =>
+                typeof p === 'string' ? (
+                  <span key={p} className="page-ellipsis">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => fetchAdminBooks(p)}
+                    className={`page-btn ${bookPage === p ? 'active' : ''}`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -465,36 +518,56 @@ export default function AdminDashboard() {
       )}
 
       {tab === 'users' && (
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Nama</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Bergabung</th>
-              <th>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id}>
-                <td>{u.name}</td>
-                <td>{u.email}</td>
-                <td>
-                  <span className={`badge ${u.role}`}>{u.role}</span>
-                </td>
-                <td>{new Date(u.created_at).toLocaleDateString('id-ID')}</td>
-                <td>
-                  {!isAdminRole(u.role) && (
-                    <button className="btn-small danger" onClick={() => deleteUser(u.id)}>
-                      Hapus
-                    </button>
-                  )}
-                </td>
+        <>
+          <h2>Daftar Pengguna ({userTotal})</h2>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Nama</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Bergabung</th>
+                <th>Aksi</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.name}</td>
+                  <td>{u.email}</td>
+                  <td>
+                    <span className={`badge ${u.role}`}>{u.role}</span>
+                  </td>
+                  <td>{new Date(u.created_at).toLocaleDateString('id-ID')}</td>
+                  <td>
+                    {!isAdminRole(u.role) && (
+                      <button className="btn-small danger" onClick={() => deleteUser(u.id)}>
+                        Hapus
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {userTotal > USER_ADMIN_LIMIT && (
+            <div className="pagination">
+              {buildPageRange(userPage, Math.ceil(userTotal / USER_ADMIN_LIMIT)).map((p) =>
+                typeof p === 'string' ? (
+                  <span key={p} className="page-ellipsis">…</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => fetchAdminUsers(p)}
+                    className={`page-btn ${userPage === p ? 'active' : ''}`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {tab === 'borrows' && (
@@ -569,4 +642,17 @@ export default function AdminDashboard() {
       )}
     </div>
   );
+}
+
+function buildPageRange(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages = [];
+  pages.push(1);
+  if (current > 3) pages.push('...-before');
+  for (let p = Math.max(2, current - 1); p <= Math.min(total - 1, current + 1); p++) {
+    pages.push(p);
+  }
+  if (current < total - 2) pages.push('...-after');
+  pages.push(total);
+  return pages;
 }
