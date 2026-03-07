@@ -33,8 +33,28 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
+    let cancelled = false;
+    async function loadInitialData() {
+      try {
+        const [bRes, cRes, uRes] = await Promise.all([
+          api.get('/books?limit=100'),
+          api.get('/categories'),
+          api.get('/users'),
+        ]);
+        if (!cancelled) {
+          setBooks(bRes.data.data);
+          setCategories(cRes.data);
+          setUsers(uRes.data.data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setMessage(err.response?.data?.message || 'Gagal memuat data');
+        }
+      }
+    }
+    loadInitialData();
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleBookSubmit(e) {
     e.preventDefault();
