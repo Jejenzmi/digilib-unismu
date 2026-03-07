@@ -8,7 +8,14 @@ Aplikasi perpustakaan digital Universitas Muslim Indonesia (UNISMU), dibangun de
 
 - 📚 Katalog buku dengan pencarian dan filter kategori
 - 🔐 Autentikasi pengguna (JWT) – registrasi & login
-- 📖 Peminjaman & pengembalian buku
+- 📖 Peminjaman & pengembalian buku (durasi 14 hari)
+- 🔄 Perpanjangan peminjaman (1 kali, +14 hari)
+- ⏳ Reservasi buku (sistem antrean jika stok habis)
+- 💰 Perhitungan denda otomatis (Rp 1.000/hari keterlambatan)
+- ⭐ Ulasan & penilaian buku (1–5 bintang, khusus peminjam)
+- ❤️ Wishlist / daftar keinginan per pengguna
+- 📣 Pengumuman perpustakaan oleh admin
+- 📊 Dashboard statistik & analitik untuk admin
 - 🛠️ Dashboard admin – manajemen buku, kategori, dan pengguna
 - 📁 Upload cover buku dan file PDF
 - 🗄️ Database PostgreSQL
@@ -129,31 +136,68 @@ digilib-unismu/
 | POST   | /api/auth/login       | Login            |
 
 ### Buku
-| Method | Endpoint                  | Akses       |
-|--------|---------------------------|-------------|
-| GET    | /api/books                | Publik      |
-| GET    | /api/books/:id            | Publik      |
-| POST   | /api/books                | Admin       |
-| PUT    | /api/books/:id            | Admin       |
-| DELETE | /api/books/:id            | Admin       |
-| POST   | /api/books/:id/borrow     | User login  |
-| POST   | /api/books/:id/return     | User login  |
+| Method | Endpoint                      | Akses                      |
+|--------|-------------------------------|----------------------------|
+| GET    | /api/books                    | Publik                     |
+| GET    | /api/books/:id                | Publik                     |
+| POST   | /api/books                    | Admin                      |
+| PUT    | /api/books/:id                | Admin                      |
+| DELETE | /api/books/:id                | Admin                      |
+| POST   | /api/books/:id/borrow         | User login                 |
+| POST   | /api/books/:id/return         | User login                 |
+| POST   | /api/books/:id/renew          | User login                 |
+| POST   | /api/books/:id/reserve        | User login                 |
+| DELETE | /api/books/:id/reserve        | User login                 |
+| GET    | /api/books/:id/reviews        | Publik                     |
+| POST   | /api/books/:id/reviews        | User login (pernah pinjam) |
+| DELETE | /api/books/:id/reviews/:revId | Pemilik ulasan / Admin     |
+| POST   | /api/books/:id/wishlist       | User login                 |
+| DELETE | /api/books/:id/wishlist       | User login                 |
 
 ### Kategori
 | Method | Endpoint              | Akses  |
 |--------|-----------------------|--------|
 | GET    | /api/categories       | Publik |
+| GET    | /api/categories/:id   | Publik |
 | POST   | /api/categories       | Admin  |
 | PUT    | /api/categories/:id   | Admin  |
 | DELETE | /api/categories/:id   | Admin  |
 
 ### Pengguna
-| Method | Endpoint              | Akses  |
-|--------|-----------------------|--------|
-| GET    | /api/users/me         | Login  |
-| PUT    | /api/users/me         | Login  |
-| GET    | /api/users/me/borrows | Login  |
-| GET    | /api/users            | Admin  |
-| DELETE | /api/users/:id        | Admin  |
-| GET    | /api/users/borrows    | Admin  |
+| Method | Endpoint                   | Akses  |
+|--------|----------------------------|--------|
+| GET    | /api/users/me              | Login  |
+| PUT    | /api/users/me              | Login  |
+| GET    | /api/users/me/borrows      | Login  |
+| GET    | /api/users/me/reservations | Login  |
+| GET    | /api/users/me/wishlist     | Login  |
+| GET    | /api/users                 | Admin  |
+| DELETE | /api/users/:id             | Admin  |
+| GET    | /api/users/borrows         | Admin  |
+
+### Statistik
+| Method | Endpoint    | Akses |
+|--------|-------------|-------|
+| GET    | /api/stats  | Admin |
+
+### Pengumuman
+| Method | Endpoint               | Akses  |
+|--------|------------------------|--------|
+| GET    | /api/announcements     | Publik |
+| POST   | /api/announcements     | Admin  |
+| DELETE | /api/announcements/:id | Admin  |
+
+---
+
+## SOP & Workflow
+
+Untuk panduan lengkap alur kerja dan Standar Operasional Prosedur (SOP) aplikasi, lihat:
+
+📄 **[docs/SOP.md](docs/SOP.md)**
+
+Dokumen tersebut mencakup:
+- SOP untuk pengguna (registrasi, login, pinjam, kembali, perpanjangan, reservasi, ulasan, wishlist, profil)
+- SOP untuk administrator (kelola buku, kategori, pengguna, statistik, pengumuman)
+- Diagram workflow lengkap untuk setiap proses utama
+- Kebijakan sistem (durasi pinjam, denda, batas file, dll.)
 
