@@ -4,19 +4,25 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [borrows, setBorrows] = useState([]);
   const [form, setForm] = useState({
-    name: user?.name ?? '',
-    email: user?.email ?? '',
+    name: '',
+    email: '',
     password: '',
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [borrowError, setBorrowError] = useState('');
 
+  const [profileError, setProfileError] = useState('');
+
   useEffect(() => {
+    api
+      .get('/users/me')
+      .then(({ data }) => setForm((prev) => ({ ...prev, name: data.name, email: data.email })))
+      .catch(() => setProfileError('Gagal memuat data profil. Silakan muat ulang halaman.'));
     api
       .get('/users/me/borrows')
       .then(({ data }) => setBorrows(data))
@@ -30,7 +36,9 @@ export default function Profile() {
     try {
       const payload = { name: form.name, email: form.email };
       if (form.password) payload.password = form.password;
-      await api.put('/users/me', payload);
+      const { data } = await api.put('/users/me', payload);
+      updateUser(data.data);
+      setForm((prev) => ({ ...prev, password: '' }));
       setMessage('Profil berhasil diperbarui');
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal memperbarui profil');
@@ -49,6 +57,7 @@ export default function Profile() {
       <div className="profile-grid">
         <div className="profile-form">
           <h2>Edit Profil</h2>
+          {profileError && <div className="error-msg">{profileError}</div>}
           {message && <div className="alert success">{message}</div>}
           {error && <div className="error-msg">{error}</div>}
           <form onSubmit={handleUpdate}>
@@ -102,6 +111,7 @@ export default function Profile() {
                   <th>Buku</th>
                   <th>Tanggal Pinjam</th>
                   <th>Jatuh Tempo</th>
+                  <th>Tanggal Kembali</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -111,6 +121,7 @@ export default function Profile() {
                     <td>{b.title}</td>
                     <td>{new Date(b.borrow_date).toLocaleDateString('id-ID')}</td>
                     <td>{new Date(b.due_date).toLocaleDateString('id-ID')}</td>
+                    <td>{b.return_date ? new Date(b.return_date).toLocaleDateString('id-ID') : '-'}</td>
                     <td>
                       <span className={`status-badge ${b.status}`}>{b.status}</span>
                     </td>
