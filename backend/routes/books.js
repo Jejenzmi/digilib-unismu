@@ -522,14 +522,14 @@ router.delete('/:id/reserve', borrowLimiter, authenticate, async (req, res) => {
 });
 
 // GET /api/books/:id/reviews  – public
-router.get('/:id/reviews', async (req, res) => {
+router.get('/:id/reviews', borrowLimiter, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
   try {
     const db = getDb();
     const [reviewsResult, avgResult] = await Promise.all([
       db.query(
-        `SELECT r.id, r.rating, r.comment, r.created_at, u.name AS user_name
+        `SELECT r.id, r.user_id, r.rating, r.comment, r.created_at, u.name AS user_name
          FROM reviews r
          JOIN users u ON r.user_id = u.id
          WHERE r.book_id = $1
@@ -554,7 +554,7 @@ router.get('/:id/reviews', async (req, res) => {
 });
 
 // POST /api/books/:id/reviews  – authenticated, only if user has borrowed the book
-router.post('/:id/reviews', authenticate, async (req, res) => {
+router.post('/:id/reviews', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
 
@@ -596,7 +596,7 @@ router.post('/:id/reviews', authenticate, async (req, res) => {
 });
 
 // DELETE /api/books/:id/reviews/:reviewId  – authenticated (own review) or admin
-router.delete('/:id/reviews/:reviewId', authenticate, async (req, res) => {
+router.delete('/:id/reviews/:reviewId', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);
   const reviewId = parseId(req.params.reviewId);
   if (isNaN(id) || isNaN(reviewId)) return res.status(400).json({ message: 'ID tidak valid' });
@@ -623,7 +623,7 @@ router.delete('/:id/reviews/:reviewId', authenticate, async (req, res) => {
 });
 
 // POST /api/books/:id/wishlist  – authenticated, add to wishlist
-router.post('/:id/wishlist', authenticate, async (req, res) => {
+router.post('/:id/wishlist', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
 
@@ -644,7 +644,7 @@ router.post('/:id/wishlist', authenticate, async (req, res) => {
 });
 
 // DELETE /api/books/:id/wishlist  – authenticated, remove from wishlist
-router.delete('/:id/wishlist', authenticate, async (req, res) => {
+router.delete('/:id/wishlist', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
 

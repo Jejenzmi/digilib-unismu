@@ -2,8 +2,18 @@ const express = require('express');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const { validateLength, parseId } = require('../utils');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
+
+// Rate limit for announcement writes: 20 requests per 15 minutes per IP
+const announcementLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Terlalu banyak permintaan, coba lagi setelah 15 menit' },
+});
 
 // GET /api/announcements  – public, returns 10 most recent announcements
 router.get('/', async (req, res) => {
@@ -23,8 +33,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/announcements  – admin only, create announcement
-router.post('/', authenticate, requireAdmin, async (req, res) => {
+// POST /api/announcements  – admin and kepala IT only, create announcement
+router.post('/', announcementLimiter, authenticate, requireAdmin, async (req, res) => {
   const { title, content } = req.body;
   if (!title?.trim() || !content?.trim()) {
     return res.status(400).json({ message: 'Judul dan konten wajib diisi' });
@@ -49,8 +59,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/announcements/:id  – admin only
-router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+// DELETE /api/announcements/:id  – admin and kepala IT only
+router.delete('/:id', announcementLimiter, authenticate, requireAdmin, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID pengumuman tidak valid' });
 

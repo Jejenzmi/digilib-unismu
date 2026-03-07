@@ -69,7 +69,7 @@ export default function BookDetail() {
         setReviews(data.reviews);
         setAvgRating(data.avg_rating);
         if (user) {
-          const own = data.reviews.find((r) => r.user_name === user.name);
+          const own = data.reviews.find((r) => r.user_id === user.id);
           setUserReview(own || null);
         }
       })
@@ -360,7 +360,7 @@ export default function BookDetail() {
                   <strong>{r.user_name}</strong>
                   <span className="stars">{renderStars(r.rating)}</span>
                   <small>{new Date(r.created_at).toLocaleDateString('id-ID')}</small>
-                  {(isAdmin || (user && r.user_name === user.name)) && (
+                  {(isAdmin || (user && r.user_id === user.id)) && (
                     <button
                       className="btn-small danger"
                       onClick={() => handleDeleteReview(r.id)}
