@@ -19,7 +19,10 @@ export default function AdminDashboard() {
   });
   const [catForm, setCatForm] = useState({ name: '', description: '' });
   const [editId, setEditId] = useState(null);
+  const [editCatId, setEditCatId] = useState(null);
   const [message, setMessage] = useState('');
+  const [coverFile, setCoverFile] = useState(null);
+  const [bookFile, setBookFile] = useState(null);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -64,17 +67,31 @@ export default function AdminDashboard() {
     e.preventDefault();
     setMessage('');
     try {
+      const formData = new FormData();
+      formData.append('title', bookForm.title);
+      formData.append('author', bookForm.author);
+      formData.append('isbn', bookForm.isbn);
+      formData.append('category_id', bookForm.category_id);
+      formData.append('description', bookForm.description);
+      formData.append('publisher', bookForm.publisher);
+      formData.append('year', bookForm.year);
+      formData.append('available_copies', bookForm.available_copies);
+      if (coverFile) formData.append('cover_image', coverFile);
+      if (bookFile) formData.append('file', bookFile);
+
       if (editId) {
-        await api.put(`/books/${editId}`, bookForm);
+        await api.put(`/books/${editId}`, formData);
         setMessage('Buku berhasil diperbarui');
       } else {
-        await api.post('/books', bookForm);
+        await api.post('/books', formData);
         setMessage('Buku berhasil ditambahkan');
       }
       setBookForm({
         title: '', author: '', isbn: '', category_id: '', description: '',
         publisher: '', year: '', available_copies: 1,
       });
+      setCoverFile(null);
+      setBookFile(null);
       setEditId(null);
       fetchAll();
     } catch (err) {
@@ -94,6 +111,8 @@ export default function AdminDashboard() {
       year: book.year || '',
       available_copies: book.available_copies,
     });
+    setCoverFile(null);
+    setBookFile(null);
     setTab('books');
     window.scrollTo(0, 0);
   }
@@ -113,12 +132,18 @@ export default function AdminDashboard() {
     e.preventDefault();
     setMessage('');
     try {
-      await api.post('/categories', catForm);
-      setMessage('Kategori ditambahkan');
+      if (editCatId) {
+        await api.put(`/categories/${editCatId}`, catForm);
+        setMessage('Kategori berhasil diperbarui');
+      } else {
+        await api.post('/categories', catForm);
+        setMessage('Kategori ditambahkan');
+      }
       setCatForm({ name: '', description: '' });
+      setEditCatId(null);
       fetchAll();
     } catch (err) {
-      setMessage(err.response?.data?.message || 'Gagal menambahkan kategori');
+      setMessage(err.response?.data?.message || 'Gagal menyimpan kategori');
     }
   }
 
@@ -243,6 +268,24 @@ export default function AdminDashboard() {
                   rows={3}
                 />
               </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Foto Sampul</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>File PDF</label>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(e) => setBookFile(e.target.files?.[0] || null)}
+                  />
+                </div>
+              </div>
               <div className="form-actions">
                 <button type="submit" className="btn-primary">
                   {editId ? 'Perbarui' : 'Tambah'} Buku
@@ -257,6 +300,8 @@ export default function AdminDashboard() {
                         title: '', author: '', isbn: '', category_id: '',
                         description: '', publisher: '', year: '', available_copies: 1,
                       });
+                      setCoverFile(null);
+                      setBookFile(null);
                     }}
                   >
                     Batal
@@ -304,7 +349,7 @@ export default function AdminDashboard() {
       {tab === 'categories' && (
         <>
           <div className="admin-form-card">
-            <h2>Tambah Kategori</h2>
+            <h2>{editCatId ? 'Edit Kategori' : 'Tambah Kategori'}</h2>
             <form onSubmit={handleCatSubmit} className="admin-form">
               <div className="form-row">
                 <div className="form-group">
@@ -323,9 +368,23 @@ export default function AdminDashboard() {
                   />
                 </div>
               </div>
-              <button type="submit" className="btn-primary">
-                Tambah Kategori
-              </button>
+              <div className="form-actions">
+                <button type="submit" className="btn-primary">
+                  {editCatId ? 'Perbarui' : 'Tambah'} Kategori
+                </button>
+                {editCatId && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => {
+                      setEditCatId(null);
+                      setCatForm({ name: '', description: '' });
+                    }}
+                  >
+                    Batal
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
@@ -345,6 +404,16 @@ export default function AdminDashboard() {
                   <td>{c.description || '-'}</td>
                   <td>{c.book_count}</td>
                   <td>
+                    <button
+                      className="btn-small"
+                      onClick={() => {
+                        setEditCatId(c.id);
+                        setCatForm({ name: c.name, description: c.description || '' });
+                        window.scrollTo(0, 0);
+                      }}
+                    >
+                      Edit
+                    </button>
                     <button className="btn-small danger" onClick={() => deleteCat(c.id)}>
                       Hapus
                     </button>
