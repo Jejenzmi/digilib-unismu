@@ -22,14 +22,18 @@ export default function AdminDashboard() {
   const [message, setMessage] = useState('');
 
   const fetchAll = useCallback(async () => {
-    const [bRes, cRes, uRes] = await Promise.all([
-      api.get('/books?limit=100'),
-      api.get('/categories'),
-      api.get('/users'),
-    ]);
-    setBooks(bRes.data.data);
-    setCategories(cRes.data);
-    setUsers(uRes.data.data);
+    try {
+      const [bRes, cRes, uRes] = await Promise.all([
+        api.get('/books?limit=100'),
+        api.get('/categories'),
+        api.get('/users'),
+      ]);
+      setBooks(bRes.data.data);
+      setCategories(cRes.data);
+      setUsers(uRes.data.data);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal memuat data');
+    }
   }, []);
 
   useEffect(() => {
@@ -107,10 +111,15 @@ export default function AdminDashboard() {
 
   async function handleCatSubmit(e) {
     e.preventDefault();
-    await api.post('/categories', catForm);
-    setMessage('Kategori ditambahkan');
-    setCatForm({ name: '', description: '' });
-    fetchAll();
+    setMessage('');
+    try {
+      await api.post('/categories', catForm);
+      setMessage('Kategori ditambahkan');
+      setCatForm({ name: '', description: '' });
+      fetchAll();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal menambahkan kategori');
+    }
   }
 
   async function deleteCat(id) {

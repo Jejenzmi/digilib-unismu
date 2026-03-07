@@ -59,6 +59,9 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 // PUT /api/categories/:id  – admin only
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   const { name, description } = req.body;
+  if (name !== undefined && !name) {
+    return res.status(400).json({ message: 'Nama kategori tidak boleh kosong' });
+  }
   try {
     const db = getDb();
     const existing = await db.query('SELECT * FROM categories WHERE id = $1', [req.params.id]);
