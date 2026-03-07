@@ -65,9 +65,10 @@ router.get('/', async (req, res) => {
       params.push(`%${search}%`);
       paramIdx += 1;
     }
-    if (category_id) {
+    const categoryIdNum = category_id ? parseInt(category_id, 10) : NaN;
+    if (!isNaN(categoryIdNum) && categoryIdNum > 0) {
       where += ` AND b.category_id = $${paramIdx}`;
-      params.push(Number(category_id));
+      params.push(categoryIdNum);
       paramIdx += 1;
     }
 
@@ -290,32 +291,44 @@ router.post('/:id/borrow', authenticate, async (req, res) => {
 
 // POST /api/books/:id/return  – authenticated users
 router.post('/:id/return', authenticate, async (req, res) => {
+  const db = getDb();
+  const client = await db.connect();
+  let transactionStarted = false;
   try {
-    const db = getDb();
-    const borrowResult = await db.query(
+    await client.query('BEGIN');
+    transactionStarted = true;
+
+    const borrowResult = await client.query(
       "SELECT * FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
       [req.user.id, req.params.id]
     );
     const borrow = borrowResult.rows[0];
 
     if (!borrow) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ message: 'Tidak ada peminjaman aktif untuk buku ini' });
     }
 
-    await db.query(
+    await client.query(
       "UPDATE borrows SET status = 'returned', return_date = NOW() WHERE id = $1",
       [borrow.id]
     );
 
-    await db.query('UPDATE books SET available_copies = available_copies + 1 WHERE id = $1', [
+    await client.query('UPDATE books SET available_copies = available_copies + 1 WHERE id = $1', [
       req.params.id,
     ]);
 
+    await client.query('COMMIT');
     res.json({ message: 'Pengembalian berhasil' });
   } catch (err) {
-    console.error(err);
+    if (transactionStarted) {
+      await client.query('ROLLBACK').catch((rollbackErr) => {
+        if (process.env.NODE_ENV !== 'production') console.error('ROLLBACK error:', rollbackErr);
+      });
+    }
+    if (process.env.NODE_ENV !== 'production') console.error(err);
     res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  } finally {
+    client.release();
   }
 });
-
-module.exports = router;

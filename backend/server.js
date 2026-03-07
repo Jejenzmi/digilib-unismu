@@ -63,7 +63,9 @@ app.use((req, res) => {
 // Global error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
-  console.error(err);
+  if (process.env.NODE_ENV !== 'production') {
+    console.error(err);
+  }
   res.status(500).json({ message: 'Terjadi kesalahan pada server' });
 });
 

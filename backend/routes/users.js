@@ -122,6 +122,10 @@ router.get('/borrows', authenticate, requireAdmin, async (req, res) => {
   try {
     const db = getDb();
     const { status } = req.query;
+    const ALLOWED_STATUSES = ['borrowed', 'returned', 'overdue'];
+    if (status && !ALLOWED_STATUSES.includes(status)) {
+      return res.status(400).json({ message: 'Status tidak valid' });
+    }
     const { page, limit, offset } = parsePagination(req.query, 20);
 
     let where = 'WHERE 1=1';
