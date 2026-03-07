@@ -70,9 +70,11 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ message: 'Email dan password wajib diisi' });
   }
 
+  const trimmedEmail = String(email).trim();
+
   try {
     const db = getDb();
-    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+    const result = await db.query('SELECT * FROM users WHERE email = $1', [trimmedEmail]);
     const user = result.rows[0];
     if (!user || !bcrypt.compareSync(password, user.password)) {
       return res.status(401).json({ message: 'Email atau password salah' });
