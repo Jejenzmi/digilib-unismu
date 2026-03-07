@@ -124,7 +124,7 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
     const { title, author, isbn, category_id, description, publisher, year, available_copies } =
       req.body;
 
-    if (!title || !author) {
+    if (!title?.trim() || !author?.trim()) {
       return res.status(400).json({ message: 'Judul dan penulis wajib diisi' });
     }
 
@@ -195,6 +195,19 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
       const yearResult = parseYear(year, existing.year);
       if (yearResult.error) return res.status(400).json({ message: yearResult.error });
 
+      let resolvedCategoryId = existing.category_id;
+      if (category_id !== undefined) {
+        if (category_id === '' || category_id === null) {
+          resolvedCategoryId = null;
+        } else {
+          const catId = parseInt(category_id, 10);
+          if (isNaN(catId) || catId <= 0) {
+            return res.status(400).json({ message: 'ID kategori tidak valid' });
+          }
+          resolvedCategoryId = catId;
+        }
+      }
+
       const newCoverFilename = req.files?.cover_image?.[0]?.filename;
       const newFileFilename = req.files?.file?.[0]?.filename;
 
@@ -212,7 +225,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
           title ?? existing.title,
           author ?? existing.author,
           isbn ?? existing.isbn,
-          category_id ? Number(category_id) : existing.category_id,
+          resolvedCategoryId,
           description ?? existing.description,
           publisher ?? existing.publisher,
           yearResult.year,
@@ -306,7 +319,7 @@ router.post('/:id/borrow', authenticate, async (req, res) => {
     }
 
     const alreadyBorrowing = await client.query(
-      "SELECT id FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
+      "SELECT id FROM borrows WHERE user_id = $1 AND book_id = $2 AND status IN ('borrowed', 'overdue')",
       [req.user.id, id]
     );
     if (alreadyBorrowing.rows[0]) {

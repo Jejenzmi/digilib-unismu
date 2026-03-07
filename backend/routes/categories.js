@@ -41,7 +41,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/categories  – admin only
 router.post('/', authenticate, requireAdmin, async (req, res) => {
   const { name, description } = req.body;
-  if (!name) return res.status(400).json({ message: 'Nama kategori wajib diisi' });
+  if (!name || !name.trim()) return res.status(400).json({ message: 'Nama kategori wajib diisi' });
 
   try {
     const db = getDb();
@@ -64,7 +64,7 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID kategori tidak valid' });
   const { name, description } = req.body;
-  if (name !== undefined && !name) {
+  if (name !== undefined && (!name || !name.trim())) {
     return res.status(400).json({ message: 'Nama kategori tidak boleh kosong' });
   }
   try {
@@ -73,9 +73,18 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
     if (!existing.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
 
     const row = existing.rows[0];
+
+    if (name && name.trim() !== row.name) {
+      const duplicate = await db.query(
+        'SELECT id FROM categories WHERE name = $1 AND id != $2',
+        [name.trim(), id]
+      );
+      if (duplicate.rows[0]) return res.status(409).json({ message: 'Nama kategori sudah digunakan' });
+    }
+
     const result = await db.query(
       'UPDATE categories SET name = $1, description = $2 WHERE id = $3 RETURNING *',
-      [name ?? row.name, description ?? row.description, id]
+      [name !== undefined ? name.trim() : row.name, description ?? row.description, id]
     );
     res.json({ message: 'Kategori berhasil diperbarui', data: result.rows[0] });
   } catch (err) {
