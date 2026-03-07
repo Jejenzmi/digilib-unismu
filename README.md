@@ -191,6 +191,22 @@ digilib-unismu/
 
 ---
 
+## Instalasi di VPS (Rumah Web)
+
+Untuk panduan lengkap men-deploy aplikasi ini di VPS Rumah Web melalui terminal SSH, lihat:
+
+🖥️ **[docs/INSTALASI_VPS.md](docs/INSTALASI_VPS.md)**
+
+Panduan tersebut mencakup:
+- Koneksi SSH ke VPS Rumah Web
+- Instalasi Node.js, PostgreSQL, PM2, dan Nginx
+- Konfigurasi database dan environment
+- Build frontend dan deploy backend
+- Aktivasi SSL/HTTPS dengan Certbot
+- Perintah-perintah berguna pasca-deploy
+
+---
+
 ## SOP & Workflow
 
 Untuk panduan lengkap alur kerja dan Standar Operasional Prosedur (SOP) aplikasi, lihat:
