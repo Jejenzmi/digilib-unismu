@@ -85,6 +85,17 @@ async function initSchema() {
       created_by INTEGER     REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      type       TEXT        NOT NULL CHECK(type IN ('due_soon','overdue','reservation_available','fine','announcement')),
+      title      TEXT        NOT NULL,
+      message    TEXT        NOT NULL,
+      is_read    BOOLEAN     NOT NULL DEFAULT FALSE,
+      related_id INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // Add renewal_count column to existing borrows tables (idempotent migration)
@@ -95,6 +106,11 @@ async function initSchema() {
   // Add reading_token column to store per-borrow JWT reading access token (idempotent migration)
   await pool.query(`
     ALTER TABLE borrows ADD COLUMN IF NOT EXISTS reading_token TEXT;
+  `);
+
+  // Add fine_paid column to track whether the fine for a borrow has been paid (idempotent migration)
+  await pool.query(`
+    ALTER TABLE borrows ADD COLUMN IF NOT EXISTS fine_paid BOOLEAN NOT NULL DEFAULT FALSE;
   `);
 }
 

@@ -52,6 +52,19 @@ router.post('/', announcementLimiter, authenticate, requireAdmin, async (req, re
        RETURNING *`,
       [title.trim(), content.trim(), req.user.id]
     );
+
+    // Create notifications for all users (fire-and-forget)
+    db.query(
+      `INSERT INTO notifications (user_id, type, title, message, related_id)
+       SELECT id, 'announcement', $1, $2, $3
+       FROM users`,
+      [
+        `Pengumuman: ${title.trim()}`,
+        content.trim().length > 150 ? content.trim().slice(0, 147) + '...' : content.trim(),
+        result.rows[0].id,
+      ]
+    ).catch((err) => console.error('Announcement notification error:', err));
+
     res.status(201).json({ message: 'Pengumuman berhasil dibuat', data: result.rows[0] });
   } catch (err) {
     console.error(err);

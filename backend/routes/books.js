@@ -438,18 +438,37 @@ router.post('/:id/return', borrowLimiter, authenticate, async (req, res) => {
     ]);
 
     // Notify the first pending reservation that the book is now available
-    await client.query(
+    const notifiedReservation = await client.query(
       `UPDATE reservations SET status = 'available'
        WHERE id = (
          SELECT id FROM reservations
          WHERE book_id = $1 AND status = 'pending'
          ORDER BY reserved_at ASC
          LIMIT 1
-       )`,
+       )
+       RETURNING user_id, book_id`,
       [id]
     );
 
     await client.query('COMMIT');
+
+    // Create an in-app notification for the user whose reservation is now ready (fire-and-forget)
+    if (notifiedReservation.rows[0]) {
+      const { user_id: reserveUserId } = notifiedReservation.rows[0];
+      const bookRes = await db.query('SELECT title FROM books WHERE id = $1', [id]);
+      const bookTitle = bookRes.rows[0]?.title || 'buku';
+      db.query(
+        `INSERT INTO notifications (user_id, type, title, message, related_id)
+         VALUES ($1, 'reservation_available', $2, $3, $4)`,
+        [
+          reserveUserId,
+          'Reservasi Buku Tersedia',
+          `Buku "${bookTitle}" yang Anda antri kini tersedia. Segera pinjam sebelum kedaluwarsa!`,
+          id,
+        ]
+      ).catch((err) => console.error('Reservation notification error:', err));
+    }
+
     res.json({ message: 'Pengembalian berhasil' });
   } catch (err) {
     if (transactionStarted) {

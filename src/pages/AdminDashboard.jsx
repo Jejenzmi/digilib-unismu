@@ -273,6 +273,17 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleMarkFinePaid(borrowId) {
+    if (!confirm('Tandai denda peminjaman ini sebagai lunas?')) return;
+    try {
+      const { data } = await api.put(`/users/borrows/${borrowId}/fine-paid`);
+      setMessage(data.message);
+      fetchBorrows(borrowPage, borrowStatus);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal menandai denda lunas');
+    }
+  }
+
   return (
     <div className="page">
       <h1>Dashboard Admin</h1>
@@ -674,7 +685,22 @@ export default function AdminDashboard() {
                   </td>
                   <td>
                     {b.fine_amount > 0 ? (
-                      <span className="fine-amount">Rp{b.fine_amount.toLocaleString('id-ID')}</span>
+                      <div className="fine-cell">
+                        <span className={`fine-amount${b.fine_paid ? ' fine-paid' : ''}`}>
+                          Rp{b.fine_amount.toLocaleString('id-ID')}
+                        </span>
+                        {b.fine_paid ? (
+                          <span className="fine-paid-badge">✓ Lunas</span>
+                        ) : (
+                          <button
+                            className="btn-small"
+                            onClick={() => handleMarkFinePaid(b.id)}
+                            title="Tandai denda lunas"
+                          >
+                            Lunas
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       '-'
                     )}
