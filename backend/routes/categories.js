@@ -117,6 +117,17 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
     const existing = await db.query('SELECT id FROM categories WHERE id = $1', [id]);
     if (!existing.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
 
+    const booksCount = await db.query(
+      'SELECT COUNT(*) AS count FROM books WHERE category_id = $1',
+      [id]
+    );
+    const count = parseInt(booksCount.rows[0].count, 10);
+    if (count > 0) {
+      return res.status(400).json({
+        message: `Kategori tidak dapat dihapus karena masih digunakan oleh ${count} buku. Pindahkan atau hapus buku tersebut terlebih dahulu.`,
+      });
+    }
+
     await db.query('DELETE FROM categories WHERE id = $1', [id]);
     res.json({ message: 'Kategori berhasil dihapus' });
   } catch (err) {

@@ -76,8 +76,8 @@ export default function Profile() {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                minLength={6}
-                placeholder="Password baru"
+                minLength={8}
+                placeholder="Password baru (min. 8 karakter)"
               />
             </div>
             <button type="submit" className="btn-primary">
