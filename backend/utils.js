@@ -1,13 +1,15 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Strip HTML tags from a user-supplied string to prevent XSS.
+ * Escape HTML angle bracket characters to prevent XSS.
+ * Replaces '<' and '>' with their HTML entity equivalents so no HTML tags
+ * can be injected into stored or rendered content.
  * @param {*} str
  * @returns {string|*} sanitized string, or the original value if not a string
  */
 function sanitizeText(str) {
   if (!str || typeof str !== 'string') return str;
-  return str.replace(/<[^>]*>/g, '');
+  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**
