@@ -8,6 +8,14 @@ const fs = require('fs');
 
 const router = express.Router();
 
+// Helper to delete an uploaded file from disk (fire-and-forget)
+function deleteUploadedFile(dir, filename) {
+  if (!filename) return;
+  fs.unlink(path.join(__dirname, '../uploads', dir, filename), (err) => {
+    if (err) console.error(`Failed to delete ${dir}/${filename}:`, err);
+  });
+}
+
 // Multer config for cover images and PDF files
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -159,6 +167,9 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       res.status(201).json({ message: 'Buku berhasil ditambahkan', data: result.rows[0] });
     } catch (dbErr) {
       console.error(dbErr);
+      // Clean up uploaded files if DB insert failed
+      deleteUploadedFile('covers', cover_image);
+      deleteUploadedFile('files', file_path);
       res.status(500).json({ message: 'Terjadi kesalahan pada server' });
     }
   });
@@ -238,16 +249,10 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 
       // Delete replaced files from disk
       if (newCoverFilename && existing.cover_image) {
-        fs.unlink(
-          path.join(__dirname, '../uploads/covers', existing.cover_image),
-          (unlinkErr) => { if (unlinkErr) console.error('Failed to delete old cover:', unlinkErr); }
-        );
+        deleteUploadedFile('covers', existing.cover_image);
       }
       if (newFileFilename && existing.file_path) {
-        fs.unlink(
-          path.join(__dirname, '../uploads/files', existing.file_path),
-          (unlinkErr) => { if (unlinkErr) console.error('Failed to delete old file:', unlinkErr); }
-        );
+        deleteUploadedFile('files', existing.file_path);
       }
 
       res.json({ message: 'Buku berhasil diperbarui', data: updated.rows[0] });
@@ -271,18 +276,8 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 
     // Clean up uploaded files from disk
     const { cover_image, file_path } = existing.rows[0];
-    if (cover_image) {
-      fs.unlink(
-        path.join(__dirname, '../uploads/covers', cover_image),
-        (unlinkErr) => { if (unlinkErr) console.error('Failed to delete cover file:', unlinkErr); }
-      );
-    }
-    if (file_path) {
-      fs.unlink(
-        path.join(__dirname, '../uploads/files', file_path),
-        (unlinkErr) => { if (unlinkErr) console.error('Failed to delete book file:', unlinkErr); }
-      );
-    }
+    deleteUploadedFile('covers', cover_image);
+    deleteUploadedFile('files', file_path);
 
     res.json({ message: 'Buku berhasil dihapus' });
   } catch (err) {
@@ -367,7 +362,7 @@ router.post('/:id/return', authenticate, async (req, res) => {
     transactionStarted = true;
 
     const borrowResult = await client.query(
-      "SELECT * FROM borrows WHERE user_id = $1 AND book_id = $2 AND status = 'borrowed'",
+      "SELECT * FROM borrows WHERE user_id = $1 AND book_id = $2 AND status IN ('borrowed', 'overdue')",
       [req.user.id, id]
     );
     const borrow = borrowResult.rows[0];

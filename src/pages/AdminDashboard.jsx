@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
+import { isAdminRole } from '../utils/roles';
 
 export default function AdminDashboard() {
   const [books, setBooks] = useState([]);
@@ -238,7 +239,7 @@ export default function AdminDashboard() {
                     min="0"
                     value={bookForm.available_copies}
                     onChange={(e) =>
-                      setBookForm({ ...bookForm, available_copies: e.target.value })
+                      setBookForm({ ...bookForm, available_copies: parseInt(e.target.value, 10) || 0 })
                     }
                   />
                 </div>
@@ -429,7 +430,7 @@ export default function AdminDashboard() {
                 </td>
                 <td>{new Date(u.created_at).toLocaleDateString('id-ID')}</td>
                 <td>
-                  {u.role !== 'admin' && (
+                  {!isAdminRole(u.role) && (
                     <button className="btn-small danger" onClick={() => deleteUser(u.id)}>
                       Hapus
                     </button>
