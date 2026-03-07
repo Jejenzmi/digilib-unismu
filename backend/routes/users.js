@@ -120,6 +120,27 @@ router.get('/me/reservations', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/users/me/wishlist  – get own wishlist
+router.get('/me/wishlist', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query(
+      `SELECT w.id, w.added_at, b.id AS book_id, b.title, b.author, b.cover_image,
+              b.available_copies, c.name AS category_name
+       FROM wishlist w
+       JOIN books b ON w.book_id = b.id
+       LEFT JOIN categories c ON b.category_id = c.id
+       WHERE w.user_id = $1
+       ORDER BY w.added_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
 // GET /api/users  – admin: list all users
 router.get('/', authenticate, requireAdmin, async (req, res) => {
   try {

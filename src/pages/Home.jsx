@@ -5,17 +5,20 @@ import api from '../api';
 export default function Home() {
   const [stats, setStats] = useState({ books: 0, categories: 0 });
   const [recentBooks, setRecentBooks] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [error, setError] = useState('');
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [booksRes, catsRes] = await Promise.all([
+        const [booksRes, catsRes, announcementsRes] = await Promise.all([
           api.get('/books?limit=6'),
           api.get('/categories'),
+          api.get('/announcements'),
         ]);
         setRecentBooks(booksRes.data.data);
         setStats({ books: booksRes.data.total, categories: catsRes.data.length });
+        setAnnouncements(announcementsRes.data);
       } catch (err) {
         setError(err.response?.data?.message || 'Gagal memuat data. Silakan coba lagi.');
       }
@@ -26,6 +29,25 @@ export default function Home() {
   return (
     <div className="page">
       {error && <div className="error-msg">{error}</div>}
+
+      {announcements.length > 0 && (
+        <section className="announcements-section">
+          <h2>📢 Pengumuman</h2>
+          <div className="announcements-list">
+            {announcements.map((a) => (
+              <div key={a.id} className="announcement-card">
+                <h3>{a.title}</h3>
+                <p>{a.content}</p>
+                <small>
+                  {a.created_by_name && <span>{a.created_by_name} · </span>}
+                  {new Date(a.created_at).toLocaleDateString('id-ID')}
+                </small>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="hero">
         <h1>Perpustakaan Digital UNISMU</h1>
         <p>Temukan ribuan koleksi buku ilmiah, referensi, dan karya akademik.</p>

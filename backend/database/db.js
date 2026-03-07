@@ -59,6 +59,32 @@ async function initSchema() {
       status      TEXT        NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','available','cancelled')),
       UNIQUE(user_id, book_id)
     );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      book_id    INTEGER     NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+      rating     INTEGER     NOT NULL CHECK (rating BETWEEN 1 AND 5),
+      comment    TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id, book_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS wishlist (
+      id       SERIAL PRIMARY KEY,
+      user_id  INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      book_id  INTEGER     NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+      added_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(user_id, book_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS announcements (
+      id         SERIAL PRIMARY KEY,
+      title      TEXT        NOT NULL,
+      content    TEXT        NOT NULL,
+      created_by INTEGER     REFERENCES users(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 
   // Add renewal_count column to existing borrows tables (idempotent migration)

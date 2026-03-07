@@ -521,6 +521,147 @@ router.delete('/:id/reserve', borrowLimiter, authenticate, async (req, res) => {
   }
 });
 
+// GET /api/books/:id/reviews  – public
+router.get('/:id/reviews', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+  try {
+    const db = getDb();
+    const [reviewsResult, avgResult] = await Promise.all([
+      db.query(
+        `SELECT r.id, r.rating, r.comment, r.created_at, u.name AS user_name
+         FROM reviews r
+         JOIN users u ON r.user_id = u.id
+         WHERE r.book_id = $1
+         ORDER BY r.created_at DESC`,
+        [id]
+      ),
+      db.query(
+        `SELECT ROUND(AVG(rating)::numeric, 1) AS avg_rating, COUNT(*) AS total
+         FROM reviews WHERE book_id = $1`,
+        [id]
+      ),
+    ]);
+    res.json({
+      reviews: reviewsResult.rows,
+      avg_rating: avgResult.rows[0].avg_rating ? parseFloat(avgResult.rows[0].avg_rating) : null,
+      total: parseInt(avgResult.rows[0].total, 10),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// POST /api/books/:id/reviews  – authenticated, only if user has borrowed the book
+router.post('/:id/reviews', authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
+  const { rating, comment } = req.body;
+  const ratingNum = parseInt(rating, 10);
+  if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+    return res.status(400).json({ message: 'Rating harus antara 1 dan 5' });
+  }
+  if (comment) {
+    const commentErr = validateLength(comment, 'Komentar', 1000);
+    if (commentErr) return res.status(400).json({ message: commentErr });
+  }
+
+  try {
+    const db = getDb();
+    const bookResult = await db.query('SELECT id FROM books WHERE id = $1', [id]);
+    if (!bookResult.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+
+    const borrowResult = await db.query(
+      'SELECT id FROM borrows WHERE user_id = $1 AND book_id = $2 LIMIT 1',
+      [req.user.id, id]
+    );
+    if (!borrowResult.rows[0]) {
+      return res.status(403).json({ message: 'Anda hanya dapat mengulas buku yang pernah dipinjam' });
+    }
+
+    const result = await db.query(
+      `INSERT INTO reviews (user_id, book_id, rating, comment)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id, book_id) DO UPDATE SET rating = $3, comment = $4, created_at = NOW()
+       RETURNING *`,
+      [req.user.id, id, ratingNum, comment || null]
+    );
+    res.status(201).json({ message: 'Ulasan berhasil disimpan', data: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// DELETE /api/books/:id/reviews/:reviewId  – authenticated (own review) or admin
+router.delete('/:id/reviews/:reviewId', authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  const reviewId = parseId(req.params.reviewId);
+  if (isNaN(id) || isNaN(reviewId)) return res.status(400).json({ message: 'ID tidak valid' });
+
+  try {
+    const db = getDb();
+    const reviewResult = await db.query(
+      'SELECT * FROM reviews WHERE id = $1 AND book_id = $2',
+      [reviewId, id]
+    );
+    if (!reviewResult.rows[0]) return res.status(404).json({ message: 'Ulasan tidak ditemukan' });
+
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'kepala IT';
+    if (reviewResult.rows[0].user_id !== req.user.id && !isAdmin) {
+      return res.status(403).json({ message: 'Tidak memiliki akses untuk menghapus ulasan ini' });
+    }
+
+    await db.query('DELETE FROM reviews WHERE id = $1', [reviewId]);
+    res.json({ message: 'Ulasan berhasil dihapus' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// POST /api/books/:id/wishlist  – authenticated, add to wishlist
+router.post('/:id/wishlist', authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
+  try {
+    const db = getDb();
+    const bookResult = await db.query('SELECT id FROM books WHERE id = $1', [id]);
+    if (!bookResult.rows[0]) return res.status(404).json({ message: 'Buku tidak ditemukan' });
+
+    await db.query(
+      'INSERT INTO wishlist (user_id, book_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [req.user.id, id]
+    );
+    res.status(201).json({ message: 'Buku berhasil ditambahkan ke wishlist' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// DELETE /api/books/:id/wishlist  – authenticated, remove from wishlist
+router.delete('/:id/wishlist', authenticate, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
+
+  try {
+    const db = getDb();
+    const result = await db.query(
+      'DELETE FROM wishlist WHERE user_id = $1 AND book_id = $2 RETURNING id',
+      [req.user.id, id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ message: 'Buku tidak ada di wishlist' });
+    res.json({ message: 'Buku dihapus dari wishlist' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
 // POST /api/books/:id/renew  – authenticated users, extend due date by 14 days (max 1 renewal)
 router.post('/:id/renew', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);

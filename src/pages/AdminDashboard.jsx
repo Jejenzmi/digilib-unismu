@@ -14,6 +14,8 @@ export default function AdminDashboard() {
   const [borrowStatus, setBorrowStatus] = useState('');
   const [tab, setTab] = useState('books');
   const [stats, setStats] = useState(null);
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementForm, setAnnouncementForm] = useState({ title: '', content: '' });
   const [bookForm, setBookForm] = useState({
     title: '',
     author: '',
@@ -101,6 +103,15 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const { data } = await api.get('/announcements');
+      setAnnouncements(data);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal memuat pengumuman');
+    }
+  }, []);
+
   useEffect(() => {
     async function load() {
       await fetchAll();
@@ -118,10 +129,13 @@ export default function AdminDashboard() {
     if (tab === 'stats') {
       fetchStats();
     }
+    if (tab === 'announcements') {
+      fetchAnnouncements();
+    }
     // borrowStatus intentionally omitted: status changes are handled directly
     // by the onChange handler which calls fetchBorrows itself
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, fetchBorrows, fetchStats]);
+  }, [tab, fetchBorrows, fetchStats, fetchAnnouncements]);
 
   async function handleBookSubmit(e) {
     e.preventDefault();
@@ -235,13 +249,37 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleAnnouncementSubmit(e) {
+    e.preventDefault();
+    setMessage('');
+    try {
+      await api.post('/announcements', announcementForm);
+      setMessage('Pengumuman berhasil dibuat');
+      setAnnouncementForm({ title: '', content: '' });
+      fetchAnnouncements();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal membuat pengumuman');
+    }
+  }
+
+  async function deleteAnnouncement(id) {
+    if (!confirm('Hapus pengumuman ini?')) return;
+    try {
+      await api.delete(`/announcements/${id}`);
+      setMessage('Pengumuman dihapus');
+      fetchAnnouncements();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal menghapus pengumuman');
+    }
+  }
+
   return (
     <div className="page">
       <h1>Dashboard Admin</h1>
       {message && <div className="alert">{message}</div>}
 
       <div className="tab-bar">
-        {['books', 'categories', 'users', 'borrows', 'stats'].map((t) => (
+        {['books', 'categories', 'users', 'borrows', 'stats', 'announcements'].map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -255,6 +293,8 @@ export default function AdminDashboard() {
               ? 'Pengguna'
               : t === 'borrows'
               ? 'Peminjaman'
+              : t === 'announcements'
+              ? 'Pengumuman'
               : 'Statistik'}
           </button>
         ))}
@@ -756,6 +796,73 @@ export default function AdminDashboard() {
             </>
           )}
         </div>
+      )}
+      {tab === 'announcements' && (
+        <>
+          <div className="admin-form-card">
+            <h2>Buat Pengumuman</h2>
+            <form onSubmit={handleAnnouncementSubmit} className="admin-form">
+              <div className="form-group">
+                <label>Judul *</label>
+                <input
+                  value={announcementForm.title}
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+                  required
+                  maxLength={255}
+                />
+              </div>
+              <div className="form-group">
+                <label>Konten *</label>
+                <textarea
+                  value={announcementForm.content}
+                  onChange={(e) => setAnnouncementForm({ ...announcementForm, content: e.target.value })}
+                  required
+                  rows={4}
+                  maxLength={5000}
+                />
+              </div>
+              <div className="form-actions">
+                <button type="submit" className="btn-primary">
+                  Buat Pengumuman
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <h2>Daftar Pengumuman</h2>
+          {announcements.length === 0 ? (
+            <p>Belum ada pengumuman.</p>
+          ) : (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Judul</th>
+                  <th>Konten</th>
+                  <th>Dibuat Oleh</th>
+                  <th>Tanggal</th>
+                  <th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {announcements.map((a) => (
+                  <tr key={a.id}>
+                    <td><strong>{a.title}</strong></td>
+                    <td style={{ maxWidth: '300px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {a.content}
+                    </td>
+                    <td>{a.created_by_name || '-'}</td>
+                    <td>{new Date(a.created_at).toLocaleDateString('id-ID')}</td>
+                    <td>
+                      <button className="btn-small danger" onClick={() => deleteAnnouncement(a.id)}>
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
     </div>
   );
