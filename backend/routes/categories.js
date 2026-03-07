@@ -1,6 +1,7 @@
 const express = require('express');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
+const { parseId } = require('../utils');
 
 const router = express.Router();
 
@@ -24,9 +25,11 @@ router.get('/', async (req, res) => {
 
 // GET /api/categories/:id  – public
 router.get('/:id', async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID kategori tidak valid' });
   try {
     const db = getDb();
-    const result = await db.query('SELECT * FROM categories WHERE id = $1', [req.params.id]);
+    const result = await db.query('SELECT * FROM categories WHERE id = $1', [id]);
     if (!result.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
     res.json(result.rows[0]);
   } catch (err) {
@@ -58,19 +61,21 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
 
 // PUT /api/categories/:id  – admin only
 router.put('/:id', authenticate, requireAdmin, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID kategori tidak valid' });
   const { name, description } = req.body;
   if (name !== undefined && !name) {
     return res.status(400).json({ message: 'Nama kategori tidak boleh kosong' });
   }
   try {
     const db = getDb();
-    const existing = await db.query('SELECT * FROM categories WHERE id = $1', [req.params.id]);
+    const existing = await db.query('SELECT * FROM categories WHERE id = $1', [id]);
     if (!existing.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
 
     const row = existing.rows[0];
     const result = await db.query(
       'UPDATE categories SET name = $1, description = $2 WHERE id = $3 RETURNING *',
-      [name ?? row.name, description ?? row.description, req.params.id]
+      [name ?? row.name, description ?? row.description, id]
     );
     res.json({ message: 'Kategori berhasil diperbarui', data: result.rows[0] });
   } catch (err) {
@@ -81,12 +86,14 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
 
 // DELETE /api/categories/:id  – admin only
 router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  const id = parseId(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ message: 'ID kategori tidak valid' });
   try {
     const db = getDb();
-    const existing = await db.query('SELECT id FROM categories WHERE id = $1', [req.params.id]);
+    const existing = await db.query('SELECT id FROM categories WHERE id = $1', [id]);
     if (!existing.rows[0]) return res.status(404).json({ message: 'Kategori tidak ditemukan' });
 
-    await db.query('DELETE FROM categories WHERE id = $1', [req.params.id]);
+    await db.query('DELETE FROM categories WHERE id = $1', [id]);
     res.json({ message: 'Kategori berhasil dihapus' });
   } catch (err) {
     console.error(err);

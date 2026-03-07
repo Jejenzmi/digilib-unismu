@@ -12,4 +12,48 @@ function parsePagination(query, defaultLimit = 10) {
   return { page, limit, offset };
 }
 
-module.exports = { EMAIL_REGEX, parsePagination };
+/**
+ * Parse a route param as a positive integer.
+ * Returns the parsed integer, or NaN if the value is not a valid positive integer.
+ * @param {string} value
+ * @returns {number}
+ */
+function parseId(value) {
+  const n = parseInt(value, 10);
+  if (isNaN(n) || n <= 0 || String(n) !== String(value).trim()) return NaN;
+  return n;
+}
+
+/**
+ * Validate and parse an available_copies value.
+ * @param {*} value
+ * @param {number} fallback - value to use if the input is absent
+ * @returns {{ copies: number|undefined, error: string|undefined }}
+ */
+function parseAvailableCopies(value, fallback) {
+  if (value === undefined || value === null || value === '') {
+    return { copies: fallback };
+  }
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0) {
+    return { error: 'Jumlah eksemplar harus berupa bilangan bulat non-negatif' };
+  }
+  return { copies: n };
+}
+
+/**
+ * Validate and parse a year value.
+ * @param {*} value
+ * @param {number|null} fallback - value to use if the input is absent
+ * @returns {{ year: number|null|undefined, error: string|undefined }}
+ */
+function parseYear(value, fallback) {
+  if (!value) return { year: fallback };
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1000 || n > 9999) {
+    return { error: 'Tahun tidak valid' };
+  }
+  return { year: n };
+}
+
+module.exports = { EMAIL_REGEX, parsePagination, parseId, parseAvailableCopies, parseYear };
