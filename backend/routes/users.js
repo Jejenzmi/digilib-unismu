@@ -80,11 +80,37 @@ router.get('/me/borrows', authenticate, async (req, res) => {
       "UPDATE borrows SET status = 'overdue' WHERE status = 'borrowed' AND due_date < NOW()"
     );
     const result = await db.query(
-      `SELECT br.*, b.title, b.author, b.cover_image
+      `SELECT br.*, b.title, b.author, b.cover_image,
+              CASE
+                WHEN br.status = 'overdue'
+                  THEN GREATEST(0, CEIL(EXTRACT(EPOCH FROM (NOW() - br.due_date)) / 86400))::INTEGER * 1000
+                WHEN br.status = 'returned' AND br.return_date > br.due_date
+                  THEN GREATEST(0, CEIL(EXTRACT(EPOCH FROM (br.return_date - br.due_date)) / 86400))::INTEGER * 1000
+                ELSE 0
+              END AS fine_amount
        FROM borrows br
        JOIN books b ON br.book_id = b.id
        WHERE br.user_id = $1
        ORDER BY br.borrow_date DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// GET /api/users/me/reservations  – get own active reservations
+router.get('/me/reservations', authenticate, async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.query(
+      `SELECT r.*, b.title, b.author, b.cover_image, b.available_copies
+       FROM reservations r
+       JOIN books b ON r.book_id = b.id
+       WHERE r.user_id = $1 AND r.status IN ('pending', 'available')
+       ORDER BY r.reserved_at ASC`,
       [req.user.id]
     );
     res.json(result.rows);
@@ -147,7 +173,14 @@ router.get('/borrows', authenticate, requireAdmin, async (req, res) => {
 
     const borrowsResult = await db.query(
       `SELECT br.*, u.name AS user_name, u.email AS user_email,
-              b.title AS book_title, b.author AS book_author
+              b.title AS book_title, b.author AS book_author,
+              CASE
+                WHEN br.status = 'overdue'
+                  THEN GREATEST(0, CEIL(EXTRACT(EPOCH FROM (NOW() - br.due_date)) / 86400))::INTEGER * 1000
+                WHEN br.status = 'returned' AND br.return_date > br.due_date
+                  THEN GREATEST(0, CEIL(EXTRACT(EPOCH FROM (br.return_date - br.due_date)) / 86400))::INTEGER * 1000
+                ELSE 0
+              END AS fine_amount
        FROM borrows br
        JOIN users u ON br.user_id = u.id
        JOIN books b ON br.book_id = b.id
