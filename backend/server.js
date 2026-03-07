@@ -10,6 +10,7 @@ const booksRoutes = require('./routes/books');
 const categoriesRoutes = require('./routes/categories');
 const usersRoutes = require('./routes/users');
 const statsRoutes = require('./routes/stats');
+const announcementsRoutes = require('./routes/announcements');
 
 if (!process.env.JWT_SECRET) {
   console.error('Error: JWT_SECRET tidak diatur di file .env');
@@ -60,6 +61,7 @@ app.use('/api/books', booksRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/announcements', announcementsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

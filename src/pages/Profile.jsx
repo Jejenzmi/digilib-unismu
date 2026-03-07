@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -8,6 +8,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const [borrows, setBorrows] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [wishlist, setWishlist] = useState([]);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -17,6 +18,7 @@ export default function Profile() {
   const [error, setError] = useState('');
   const [borrowError, setBorrowError] = useState('');
   const [reservationError, setReservationError] = useState('');
+  const [wishlistError, setWishlistError] = useState('');
 
   const [profileError, setProfileError] = useState('');
 
@@ -34,6 +36,13 @@ export default function Profile() {
       .catch(() => setReservationError('Gagal memuat data antrian reservasi'));
   }
 
+  function loadWishlist() {
+    return api
+      .get('/users/me/wishlist')
+      .then(({ data }) => setWishlist(data))
+      .catch(() => setWishlistError('Gagal memuat wishlist'));
+  }
+
   useEffect(() => {
     api
       .get('/users/me')
@@ -41,6 +50,7 @@ export default function Profile() {
       .catch(() => setProfileError('Gagal memuat data profil. Silakan muat ulang halaman.'));
     loadBorrows();
     loadReservations();
+    loadWishlist();
   }, []);
 
   async function handleUpdate(e) {
@@ -79,12 +89,22 @@ export default function Profile() {
     }
   }
 
+  async function handleRemoveWishlist(bookId) {
+    try {
+      await api.delete(`/books/${bookId}/wishlist`);
+      loadWishlist();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal menghapus dari wishlist');
+    }
+  }
+
   function handleLogout() {
     logout();
     navigate('/login');
   }
 
   const totalFine = borrows.reduce((sum, b) => sum + (b.fine_amount || 0), 0);
+  const coverBase = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
 
   return (
     <div className="page">
@@ -175,6 +195,48 @@ export default function Profile() {
               </table>
             </div>
           )}
+
+          {/* Wishlist Section */}
+          <div style={{ marginBottom: '2rem' }}>
+            <h2>❤️ Wishlist Saya</h2>
+            {wishlistError && <p className="error-msg">{wishlistError}</p>}
+            {wishlist.length === 0 ? (
+              <p>Belum ada buku di wishlist.</p>
+            ) : (
+              <div className="wishlist-grid">
+                {wishlist.map((w) => (
+                  <div key={w.id} className="wishlist-card">
+                    <Link to={`/books/${w.book_id}`} className="wishlist-cover">
+                      {w.cover_image ? (
+                        <img
+                          src={`${coverBase}/uploads/covers/${w.cover_image}`}
+                          alt={w.title}
+                        />
+                      ) : (
+                        <div className="book-cover-placeholder">📖</div>
+                      )}
+                    </Link>
+                    <div className="wishlist-info">
+                      <Link to={`/books/${w.book_id}`}>
+                        <strong>{w.title}</strong>
+                      </Link>
+                      <p>{w.author}</p>
+                      {w.category_name && <span className="badge">{w.category_name}</span>}
+                      <span className={`copies ${w.available_copies > 0 ? 'available' : 'unavailable'}`}>
+                        {w.available_copies > 0 ? `${w.available_copies} tersedia` : 'Tidak tersedia'}
+                      </span>
+                    </div>
+                    <button
+                      className="btn-small danger"
+                      onClick={() => handleRemoveWishlist(w.book_id)}
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <h2>Riwayat Peminjaman</h2>
           {totalFine > 0 && (
