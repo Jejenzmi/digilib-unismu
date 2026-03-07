@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { EMAIL_REGEX, parsePagination, parseId } = require('../utils');
+const { EMAIL_REGEX, parsePagination, parseId, validateLength } = require('../utils');
 
 const router = express.Router();
 
@@ -35,7 +35,12 @@ router.put('/me', authenticate, async (req, res) => {
       return res.status(400).json({ message: 'Nama tidak boleh kosong' });
     }
 
+    const nameLenErr = name !== undefined ? validateLength(name.trim(), 'Nama', 255) : undefined;
+    if (nameLenErr) return res.status(400).json({ message: nameLenErr });
+
     if (email && email !== user.email) {
+      const emailLenErr = validateLength(email.trim(), 'Email', 255);
+      if (emailLenErr) return res.status(400).json({ message: emailLenErr });
       if (!EMAIL_REGEX.test(email)) {
         return res.status(400).json({ message: 'Format email tidak valid' });
       }
@@ -46,15 +51,18 @@ router.put('/me', authenticate, async (req, res) => {
       if (taken.rows[0]) return res.status(409).json({ message: 'Email sudah digunakan' });
     }
 
-    if (password && password.length < 6) {
-      return res.status(400).json({ message: 'Password minimal 6 karakter' });
+    if (password && password.length < 8) {
+      return res.status(400).json({ message: 'Password minimal 8 karakter' });
     }
 
     const hashed = password ? bcrypt.hashSync(password, 10) : user.password;
 
+    const trimmedName = name !== undefined ? name.trim() : undefined;
+    const trimmedEmail = email !== undefined ? email.trim() : undefined;
+
     const updated = await db.query(
       'UPDATE users SET name = $1, email = $2, password = $3 WHERE id = $4 RETURNING id, name, email, role, created_at',
-      [name ?? user.name, email ?? user.email, hashed, req.user.id]
+      [trimmedName ?? user.name, trimmedEmail ?? user.email, hashed, req.user.id]
     );
     res.json({ message: 'Profil berhasil diperbarui', data: updated.rows[0] });
   } catch (err) {

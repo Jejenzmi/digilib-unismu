@@ -1,6 +1,19 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
+ * Validate a string field does not exceed maximum length.
+ * @param {*} value
+ * @param {string} fieldLabel - human-readable field name for error messages
+ * @param {number} max - maximum allowed length
+ * @returns {string|undefined} error message, or undefined if valid
+ */
+function validateLength(value, fieldLabel, max) {
+  if (value && String(value).length > max) {
+    return `${fieldLabel} tidak boleh lebih dari ${max} karakter`;
+  }
+}
+
+/**
  * Parse and validate pagination query params.
  * @param {object} query  - req.query
  * @returns {{ page: number, limit: number, offset: number }}
@@ -56,4 +69,4 @@ function parseYear(value, fallback) {
   return { year: n };
 }
 
-module.exports = { EMAIL_REGEX, parsePagination, parseId, parseAvailableCopies, parseYear };
+module.exports = { EMAIL_REGEX, validateLength, parsePagination, parseId, parseAvailableCopies, parseYear };

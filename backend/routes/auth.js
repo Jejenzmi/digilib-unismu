@@ -2,7 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { getDb } = require('../database/db');
-const { EMAIL_REGEX } = require('../utils');
+const { EMAIL_REGEX, validateLength } = require('../utils');
 
 const router = express.Router();
 
@@ -14,13 +14,19 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: 'Nama, email, dan password wajib diisi' });
   }
 
+  const nameLenErr = validateLength(name.trim(), 'Nama', 255);
+  if (nameLenErr) return res.status(400).json({ message: nameLenErr });
+
+  const emailLenErr = validateLength(email.trim(), 'Email', 255);
+  if (emailLenErr) return res.status(400).json({ message: emailLenErr });
+
   const emailRegex = EMAIL_REGEX;
   if (!emailRegex.test(email.trim())) {
     return res.status(400).json({ message: 'Format email tidak valid' });
   }
 
-  if (password.length < 6) {
-    return res.status(400).json({ message: 'Password minimal 6 karakter' });
+  if (password.length < 8) {
+    return res.status(400).json({ message: 'Password minimal 8 karakter' });
   }
 
   try {
