@@ -31,6 +31,10 @@ router.put('/me', authenticate, async (req, res) => {
     const user = userResult.rows[0];
     if (!user) return res.status(404).json({ message: 'User tidak ditemukan' });
 
+    if (name !== undefined && !name.trim()) {
+      return res.status(400).json({ message: 'Nama tidak boleh kosong' });
+    }
+
     if (email && email !== user.email) {
       if (!EMAIL_REGEX.test(email)) {
         return res.status(400).json({ message: 'Format email tidak valid' });

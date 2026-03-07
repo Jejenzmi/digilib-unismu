@@ -10,12 +10,12 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
 
-  if (!name || !email || !password) {
+  if (!name?.trim() || !email?.trim() || !password) {
     return res.status(400).json({ message: 'Nama, email, dan password wajib diisi' });
   }
 
   const emailRegex = EMAIL_REGEX;
-  if (!emailRegex.test(email)) {
+  if (!emailRegex.test(email.trim())) {
     return res.status(400).json({ message: 'Format email tidak valid' });
   }
 
@@ -25,7 +25,9 @@ router.post('/register', async (req, res) => {
 
   try {
     const db = getDb();
-    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const existing = await db.query('SELECT id FROM users WHERE email = $1', [trimmedEmail]);
     if (existing.rows[0]) {
       return res.status(409).json({ message: 'Email sudah terdaftar' });
     }
@@ -33,12 +35,12 @@ router.post('/register', async (req, res) => {
     const hashed = bcrypt.hashSync(password, 10);
     const result = await db.query(
       "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, 'user') RETURNING id",
-      [name, email, hashed]
+      [trimmedName, trimmedEmail, hashed]
     );
 
     const userId = result.rows[0].id;
     const token = jwt.sign(
-      { id: userId, email, role: 'user' },
+      { id: userId, email: trimmedEmail, role: 'user' },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
@@ -46,7 +48,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       message: 'Registrasi berhasil',
       token,
-      user: { id: userId, name, email, role: 'user' },
+      user: { id: userId, name: trimmedName, email: trimmedEmail, role: 'user' },
     });
   } catch (err) {
     console.error(err);
