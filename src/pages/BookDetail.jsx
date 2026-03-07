@@ -11,6 +11,7 @@ export default function BookDetail() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [isBorrowing, setIsBorrowing] = useState(false);
+  const [readingToken, setReadingToken] = useState(null);
   const [reservation, setReservation] = useState(null); // null | { status }
   const [inWishlist, setInWishlist] = useState(false);
   const [reviews, setReviews] = useState([]);
@@ -32,10 +33,11 @@ export default function BookDetail() {
     api
       .get('/users/me/borrows')
       .then(({ data }) => {
-        const active = data.some(
+        const activeBorrow = data.find(
           (b) => String(b.book_id) === String(id) && (b.status === 'borrowed' || b.status === 'overdue')
         );
-        setIsBorrowing(active);
+        setIsBorrowing(!!activeBorrow);
+        setReadingToken(activeBorrow?.reading_token || null);
         setHasBorrowed(data.some((b) => String(b.book_id) === String(id)));
       })
       .catch((err) => console.error('Gagal memuat status peminjaman:', err));
@@ -299,7 +301,18 @@ export default function BookDetail() {
             </p>
           )}
 
-          {book.file_path && (
+          {user && isBorrowing && readingToken && book.file_path && (
+            <a
+              href={`${import.meta.env.VITE_API_URL || '/api'}/books/${id}/read?token=${readingToken}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-read"
+            >
+              📖 Baca Buku
+            </a>
+          )}
+
+          {isAdmin && book.file_path && (
             <a
               href={`${coverBase}/uploads/files/${book.file_path}`}
               target="_blank"

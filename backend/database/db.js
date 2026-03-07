@@ -91,6 +91,11 @@ async function initSchema() {
   await pool.query(`
     ALTER TABLE borrows ADD COLUMN IF NOT EXISTS renewal_count INTEGER NOT NULL DEFAULT 0;
   `);
+
+  // Add reading_token column to store per-borrow JWT reading access token (idempotent migration)
+  await pool.query(`
+    ALTER TABLE borrows ADD COLUMN IF NOT EXISTS reading_token TEXT;
+  `);
 }
 
 function getDb() {

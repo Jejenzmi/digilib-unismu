@@ -105,6 +105,7 @@ export default function Profile() {
 
   const totalFine = borrows.reduce((sum, b) => sum + (b.fine_amount || 0), 0);
   const coverBase = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
+  const apiBase = import.meta.env.VITE_API_URL || '/api';
 
   return (
     <div className="page">
@@ -279,6 +280,16 @@ export default function Profile() {
                       )}
                     </td>
                     <td>
+                      {(b.status === 'borrowed' || b.status === 'overdue') && b.reading_token && (
+                        <a
+                          href={`${apiBase}/books/${b.book_id}/read?token=${b.reading_token}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn-small"
+                        >
+                          📖 Baca
+                        </a>
+                      )}
                       {b.status === 'borrowed' && b.renewal_count < 1 && (
                         <button
                           className="btn-small"
