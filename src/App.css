@@ -709,3 +709,173 @@ h2 { margin-bottom: 1rem; color: #2d3748; }
   color: #4a5568;
   white-space: pre-wrap;
 }
+
+/* ─── Notification Bell ──────────────────────────────────────── */
+.notif-wrapper {
+  position: relative;
+}
+.notif-bell {
+  background: transparent;
+  border: none;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: #cbd5e0;
+  padding: 0.2rem 0.4rem;
+  position: relative;
+  line-height: 1;
+  transition: color 0.2s;
+  border-radius: 6px;
+}
+.notif-bell:hover { color: #fff; border-color: transparent; }
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  background: #c53030;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -60px;
+  width: 360px;
+  max-height: 480px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: #2d3748;
+}
+
+.notif-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: #1a3a5c;
+  flex-shrink: 0;
+}
+.notif-read-all {
+  background: none;
+  border: none;
+  color: #2b6cb0;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 600;
+}
+.notif-read-all:hover { text-decoration: underline; border-color: transparent; }
+
+.notif-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.notif-empty {
+  text-align: center;
+  color: #718096;
+  padding: 2rem 1rem;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #f0f4f8;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: #f7fafc; }
+.notif-item.notif-unread { background: #ebf8ff; }
+.notif-item.notif-unread:hover { background: #bee3f8; }
+
+.notif-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.notif-body {
+  flex: 1;
+  min-width: 0;
+}
+.notif-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin: 0 0 0.2rem;
+  color: #2d3748;
+}
+.notif-msg {
+  font-size: 0.82rem;
+  color: #4a5568;
+  margin: 0 0 0.25rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.notif-time {
+  font-size: 0.75rem;
+  color: #a0aec0;
+  margin: 0;
+}
+.notif-delete {
+  background: none;
+  border: none;
+  color: #a0aec0;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: -2px;
+  transition: color 0.15s;
+}
+.notif-delete:hover { color: #c53030; border-color: transparent; }
+
+/* ─── Fine payment ───────────────────────────────────────────── */
+.fine-paid { text-decoration: line-through; color: #718096 !important; }
+.fine-paid-badge {
+  display: inline-block;
+  background: #c6f6d5;
+  color: #276749;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 20px;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+.fine-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-start;
+}
+
+@media (max-width: 480px) {
+  .notif-panel {
+    right: -80px;
+    width: calc(100vw - 2rem);
+  }
+}

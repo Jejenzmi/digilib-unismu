@@ -103,7 +103,7 @@ export default function Profile() {
     navigate('/login');
   }
 
-  const totalFine = borrows.reduce((sum, b) => sum + (b.fine_amount || 0), 0);
+  const totalFine = borrows.reduce((sum, b) => sum + (!b.fine_paid ? (b.fine_amount || 0) : 0), 0);
   const coverBase = import.meta.env.VITE_API_URL?.replace('/api', '') || '';
   const apiBase = import.meta.env.VITE_API_URL || '/api';
 
@@ -274,7 +274,10 @@ export default function Profile() {
                     </td>
                     <td>
                       {b.fine_amount > 0 ? (
-                        <span className="fine-amount">Rp{b.fine_amount.toLocaleString('id-ID')}</span>
+                        <span className={`fine-amount${b.fine_paid ? ' fine-paid' : ''}`}>
+                          Rp{b.fine_amount.toLocaleString('id-ID')}
+                          {b.fine_paid && <span className="fine-paid-badge"> ✓ Lunas</span>}
+                        </span>
                       ) : (
                         '-'
                       )}
