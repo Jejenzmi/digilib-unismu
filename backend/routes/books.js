@@ -1,12 +1,22 @@
 const express = require('express');
 const { getDb } = require('../database/db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { parsePagination, parseId, parseAvailableCopies, parseYear } = require('../utils');
+const { parsePagination, parseId, parseAvailableCopies, parseYear, validateLength } = require('../utils');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 
 const router = express.Router();
+
+// Rate limit for borrow/return: 30 requests per 15 minutes per IP
+const borrowLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Terlalu banyak permintaan peminjaman, coba lagi setelah 15 menit' },
+});
 
 // Helper to delete an uploaded file from disk (fire-and-forget)
 function deleteUploadedFile(dir, filename) {
@@ -136,6 +146,17 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
       return res.status(400).json({ message: 'Judul dan penulis wajib diisi' });
     }
 
+    const titleLenErr = validateLength(title.trim(), 'Judul', 500);
+    if (titleLenErr) return res.status(400).json({ message: titleLenErr });
+    const authorLenErr = validateLength(author.trim(), 'Penulis', 255);
+    if (authorLenErr) return res.status(400).json({ message: authorLenErr });
+    const isbnLenErr = isbn ? validateLength(isbn, 'ISBN', 30) : undefined;
+    if (isbnLenErr) return res.status(400).json({ message: isbnLenErr });
+    const publisherLenErr = publisher ? validateLength(publisher, 'Penerbit', 255) : undefined;
+    if (publisherLenErr) return res.status(400).json({ message: publisherLenErr });
+    const descLenErr = description ? validateLength(description, 'Deskripsi', 5000) : undefined;
+    if (descLenErr) return res.status(400).json({ message: descLenErr });
+
     const copiesResult = parseAvailableCopies(available_copies, 1);
     if (copiesResult.error) return res.status(400).json({ message: copiesResult.error });
 
@@ -152,8 +173,8 @@ router.post('/', authenticate, requireAdmin, async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
-          title,
-          author,
+          title.trim(),
+          author.trim(),
           isbn || null,
           category_id ? Number(category_id) : null,
           description || null,
@@ -206,6 +227,23 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
       const yearResult = parseYear(year, existing.year);
       if (yearResult.error) return res.status(400).json({ message: yearResult.error });
 
+      if (title !== undefined) {
+        if (!title.trim()) return res.status(400).json({ message: 'Judul tidak boleh kosong' });
+        const titleLenErr = validateLength(title.trim(), 'Judul', 500);
+        if (titleLenErr) return res.status(400).json({ message: titleLenErr });
+      }
+      if (author !== undefined) {
+        if (!author.trim()) return res.status(400).json({ message: 'Penulis tidak boleh kosong' });
+        const authorLenErr = validateLength(author.trim(), 'Penulis', 255);
+        if (authorLenErr) return res.status(400).json({ message: authorLenErr });
+      }
+      const isbnLenErr = isbn ? validateLength(isbn, 'ISBN', 30) : undefined;
+      if (isbnLenErr) return res.status(400).json({ message: isbnLenErr });
+      const publisherLenErr = publisher ? validateLength(publisher, 'Penerbit', 255) : undefined;
+      if (publisherLenErr) return res.status(400).json({ message: publisherLenErr });
+      const descLenErr = description ? validateLength(description, 'Deskripsi', 5000) : undefined;
+      if (descLenErr) return res.status(400).json({ message: descLenErr });
+
       let resolvedCategoryId = existing.category_id;
       if (category_id !== undefined) {
         if (category_id === '' || category_id === null) {
@@ -233,8 +271,8 @@ router.put('/:id', authenticate, requireAdmin, async (req, res) => {
          WHERE id = $11
          RETURNING *`,
         [
-          title ?? existing.title,
-          author ?? existing.author,
+          title != null ? title.trim() : existing.title,
+          author != null ? author.trim() : existing.author,
           isbn ?? existing.isbn,
           resolvedCategoryId,
           description ?? existing.description,
@@ -287,7 +325,7 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 // POST /api/books/:id/borrow  – authenticated users
-router.post('/:id/borrow', authenticate, async (req, res) => {
+router.post('/:id/borrow', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
 
@@ -350,7 +388,7 @@ router.post('/:id/borrow', authenticate, async (req, res) => {
 });
 
 // POST /api/books/:id/return  – authenticated users
-router.post('/:id/return', authenticate, async (req, res) => {
+router.post('/:id/return', borrowLimiter, authenticate, async (req, res) => {
   const id = parseId(req.params.id);
   if (isNaN(id)) return res.status(400).json({ message: 'ID buku tidak valid' });
 
@@ -385,11 +423,9 @@ router.post('/:id/return', authenticate, async (req, res) => {
     res.json({ message: 'Pengembalian berhasil' });
   } catch (err) {
     if (transactionStarted) {
-      await client.query('ROLLBACK').catch((rollbackErr) => {
-        if (process.env.NODE_ENV !== 'production') console.error('ROLLBACK error:', rollbackErr);
-      });
+      await client.query('ROLLBACK').catch(() => {});
     }
-    if (process.env.NODE_ENV !== 'production') console.error(err);
+    console.error(err);
     res.status(500).json({ message: 'Terjadi kesalahan pada server' });
   } finally {
     client.release();
