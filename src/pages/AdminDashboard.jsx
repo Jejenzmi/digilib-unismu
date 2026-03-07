@@ -8,6 +8,10 @@ export default function AdminDashboard() {
   const [bookTotal, setBookTotal] = useState(0);
   const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
+  const [borrows, setBorrows] = useState([]);
+  const [borrowTotal, setBorrowTotal] = useState(0);
+  const [borrowPage, setBorrowPage] = useState(1);
+  const [borrowStatus, setBorrowStatus] = useState('');
   const [tab, setTab] = useState('books');
   const [bookForm, setBookForm] = useState({
     title: '',
@@ -26,6 +30,8 @@ export default function AdminDashboard() {
   const [coverFile, setCoverFile] = useState(null);
   const [bookFile, setBookFile] = useState(null);
 
+  const BORROW_LIMIT = 20;
+
   const fetchAll = useCallback(async () => {
     try {
       const [bRes, cRes, uRes] = await Promise.all([
@@ -42,12 +48,37 @@ export default function AdminDashboard() {
     }
   }, []);
 
+  const fetchBorrows = useCallback(async (page = 1, status = '') => {
+    try {
+      const params = { page, limit: BORROW_LIMIT };
+      if (status) params.status = status;
+      const { data } = await api.get('/users/borrows', { params });
+      setBorrows(data.data);
+      setBorrowTotal(data.total);
+      setBorrowPage(page);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Gagal memuat data peminjaman');
+    }
+  }, []);
+
   useEffect(() => {
     async function load() {
       await fetchAll();
     }
     load();
   }, [fetchAll]);
+
+  useEffect(() => {
+    if (tab === 'borrows') {
+      async function load() {
+        await fetchBorrows(1, borrowStatus);
+      }
+      load();
+    }
+    // borrowStatus intentionally omitted: status changes are handled directly
+    // by the onChange handler which calls fetchBorrows itself
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, fetchBorrows]);
 
   async function handleBookSubmit(e) {
     e.preventDefault();
@@ -161,13 +192,19 @@ export default function AdminDashboard() {
       {message && <div className="alert">{message}</div>}
 
       <div className="tab-bar">
-        {['books', 'categories', 'users'].map((t) => (
+        {['books', 'categories', 'users', 'borrows'].map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`tab-btn ${tab === t ? 'active' : ''}`}
           >
-            {t === 'books' ? 'Buku' : t === 'categories' ? 'Kategori' : 'Pengguna'}
+            {t === 'books'
+              ? 'Buku'
+              : t === 'categories'
+              ? 'Kategori'
+              : t === 'users'
+              ? 'Pengguna'
+              : 'Peminjaman'}
           </button>
         ))}
       </div>
@@ -458,6 +495,77 @@ export default function AdminDashboard() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {tab === 'borrows' && (
+        <>
+          <div className="admin-filter-bar">
+            <label>Filter Status: </label>
+            <select
+              value={borrowStatus}
+              onChange={(e) => {
+                setBorrowStatus(e.target.value);
+                fetchBorrows(1, e.target.value);
+              }}
+            >
+              <option value="">Semua</option>
+              <option value="borrowed">Dipinjam</option>
+              <option value="overdue">Terlambat</option>
+              <option value="returned">Dikembalikan</option>
+            </select>
+          </div>
+          <h2>Daftar Peminjaman ({borrowTotal})</h2>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Peminjam</th>
+                <th>Buku</th>
+                <th>Tgl Pinjam</th>
+                <th>Jatuh Tempo</th>
+                <th>Tgl Kembali</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {borrows.map((b) => (
+                <tr key={b.id}>
+                  <td>
+                    <div>{b.user_name}</div>
+                    <small>{b.user_email}</small>
+                  </td>
+                  <td>
+                    <Link to={`/books/${b.book_id}`}>{b.book_title}</Link>
+                    <div><small>{b.book_author}</small></div>
+                  </td>
+                  <td>{new Date(b.borrow_date).toLocaleDateString('id-ID')}</td>
+                  <td>{new Date(b.due_date).toLocaleDateString('id-ID')}</td>
+                  <td>{b.return_date ? new Date(b.return_date).toLocaleDateString('id-ID') : '-'}</td>
+                  <td>
+                    <span className={`status-badge ${b.status}`}>{b.status}</span>
+                  </td>
+                </tr>
+              ))}
+              {borrows.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: 'center' }}>Tidak ada data peminjaman.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {borrowTotal > BORROW_LIMIT && (
+            <div className="pagination">
+              {Array.from({ length: Math.ceil(borrowTotal / BORROW_LIMIT) }, (_, i) => i + 1).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => fetchBorrows(p, borrowStatus)}
+                  className={`page-btn ${borrowPage === p ? 'active' : ''}`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

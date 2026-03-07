@@ -75,6 +75,10 @@ router.put('/me', authenticate, async (req, res) => {
 router.get('/me/borrows', authenticate, async (req, res) => {
   try {
     const db = getDb();
+    // Auto-mark overdue borrows before returning results
+    await db.query(
+      "UPDATE borrows SET status = 'overdue' WHERE status = 'borrowed' AND due_date < NOW()"
+    );
     const result = await db.query(
       `SELECT br.*, b.title, b.author, b.cover_image
        FROM borrows br
@@ -114,6 +118,10 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
 router.get('/borrows', authenticate, requireAdmin, async (req, res) => {
   try {
     const db = getDb();
+    // Auto-mark overdue borrows before returning results
+    await db.query(
+      "UPDATE borrows SET status = 'overdue' WHERE status = 'borrowed' AND due_date < NOW()"
+    );
     const { status } = req.query;
     const ALLOWED_STATUSES = ['borrowed', 'returned', 'overdue'];
     if (status && !ALLOWED_STATUSES.includes(status)) {
