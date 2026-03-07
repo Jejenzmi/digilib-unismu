@@ -98,25 +98,6 @@ router.get('/', authenticate, requireAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id  – admin only
-router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
-  try {
-    const db = getDb();
-    const userResult = await db.query('SELECT id FROM users WHERE id = $1', [req.params.id]);
-    if (!userResult.rows[0]) return res.status(404).json({ message: 'User tidak ditemukan' });
-
-    if (Number(req.params.id) === req.user.id) {
-      return res.status(400).json({ message: 'Tidak dapat menghapus akun sendiri' });
-    }
-
-    await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
-    res.json({ message: 'User berhasil dihapus' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
-  }
-});
-
 // GET /api/users/borrows  – admin: all borrow records
 router.get('/borrows', authenticate, requireAdmin, async (req, res) => {
   try {
@@ -156,6 +137,25 @@ router.get('/borrows', authenticate, requireAdmin, async (req, res) => {
       [...params, limit, offset]
     );
     res.json({ total, page, limit, data: borrowsResult.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
+});
+
+// DELETE /api/users/:id  – admin only
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const db = getDb();
+    const userResult = await db.query('SELECT id FROM users WHERE id = $1', [req.params.id]);
+    if (!userResult.rows[0]) return res.status(404).json({ message: 'User tidak ditemukan' });
+
+    if (Number(req.params.id) === req.user.id) {
+      return res.status(400).json({ message: 'Tidak dapat menghapus akun sendiri' });
+    }
+
+    await db.query('DELETE FROM users WHERE id = $1', [req.params.id]);
+    res.json({ message: 'User berhasil dihapus' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Terjadi kesalahan pada server' });

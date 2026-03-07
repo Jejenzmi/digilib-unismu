@@ -40,28 +40,11 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function loadInitialData() {
-      try {
-        const [bRes, cRes, uRes] = await Promise.all([
-          api.get('/books?limit=100'),
-          api.get('/categories'),
-          api.get('/users'),
-        ]);
-        if (!cancelled) {
-          setBooks(bRes.data.data);
-          setCategories(cRes.data);
-          setUsers(uRes.data.data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setMessage(err.response?.data?.message || 'Gagal memuat data');
-        }
-      }
+    async function load() {
+      await fetchAll();
     }
-    loadInitialData();
-    return () => { cancelled = true; };
-  }, []);
+    load();
+  }, [fetchAll]);
 
   async function handleBookSubmit(e) {
     e.preventDefault();
