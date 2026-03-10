@@ -1,0 +1,267 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  pustakawan_universitas
+  pustakawan_fakultas
+  mahasiswa
+  umum
+}
+
+enum StatusPeminjaman {
+  dipinjam
+  dikembalikan
+  terlambat
+  hilang
+}
+
+enum JenjangProdi {
+  D3
+  D4
+  S1
+  S2
+  S3
+}
+
+enum TipeUmum {
+  Dosen
+  Tenaga_Kependidikan
+  Masyarakat
+}
+
+model Fakultas {
+  id        Int      @id @default(autoincrement())
+  nama      String   @db.VarChar(150)
+  kode      String   @unique @db.VarChar(20)
+  warna     String   @default("#6366f1") @db.VarChar(10)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prodi     Prodi[]
+  users     User[]
+
+  @@index([isActive])
+}
+
+model Prodi {
+  id         Int          @id @default(autoincrement())
+  nama       String       @db.VarChar(150)
+  kode       String       @unique @db.VarChar(20)
+  jenjang    JenjangProdi @default(S1)
+  isActive   Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  fakultasId Int
+  fakultas   Fakultas  @relation(fields: [fakultasId], references: [id], onDelete: Cascade)
+
+  users      User[]
+  skripsi    Skripsi[]
+
+  @@index([fakultasId])
+}
+
+model User {
+  id                Int       @id @default(autoincrement())
+  name              String    @db.VarChar(200)
+  nim               String    @unique @db.VarChar(50)
+  password          String    @db.VarChar(255)
+  role              Role      @default(mahasiswa)
+  tipe              TipeUmum?
+  angkatan          String?   @db.VarChar(10)
+  email             String?   @unique @db.VarChar(100)
+  phone             String?   @db.VarChar(20)
+  avatar            String?   @db.VarChar(255)
+  alamat            String?   @db.Text
+  isActive          Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  cardExpiry        DateTime?
+  lastLogin         DateTime?
+  passwordChangedAt DateTime?
+  joinedAt          DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  fakultasId Int?
+  fakultas   Fakultas? @relation(fields: [fakultasId], references: [id], onDelete: SetNull)
+
+  prodiId    Int?
+  prodi      Prodi?    @relation(fields: [prodiId], references: [id], onDelete: SetNull)
+
+  peminjaman    Peminjaman[]
+  bookmarks     Bookmark[]
+  skripsiList   Skripsi[]
+  activityLogs  ActivityLog[]
+  refreshTokens RefreshToken[]
+
+  @@index([nim])
+  @@index([role])
+  @@index([isActive])
+  @@index([fakultasId])
+}
+
+model Book {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(300)
+  author      String   @db.VarChar(200)
+  year        Int
+  category    String   @db.VarChar(100)
+  isbn        String?  @unique @db.VarChar(50)
+  pages       Int      @default(0)
+  stok        Int      @default(1)
+  lokasi      String?  @db.VarChar(100)
+  rating      Float    @default(0)
+  downloads   Int      @default(0)
+  badge       String?  @db.VarChar(50)
+  abstract    String?  @db.Text
+  coverColor1 String   @default("#6366f1") @db.VarChar(10)
+  coverColor2 String   @default("#8b5cf6") @db.VarChar(10)
+  coverImage  String?  @db.VarChar(255)
+  filePath    String?  @db.VarChar(255)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  peminjaman  Peminjaman[]
+  bookmarks   Bookmark[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([downloads])
+  // Catatan: tambahkan CHECK constraint stok >= 0 via raw SQL setelah migrate:
+  // ALTER TABLE books ADD CONSTRAINT chk_stok_non_negative CHECK (stok >= 0);
+  @@map("books")
+}
+
+model Peminjaman {
+  id                  Int              @id @default(autoincrement())
+  tanggalPinjam       DateTime         @default(now())
+  tanggalKembali      DateTime
+  tanggalDikembalikan DateTime?
+  status              StatusPeminjaman @default(dipinjam)
+  denda               Int              @default(0)
+  dendaDibayar        Boolean          @default(false)
+  token               String?          @db.Text
+  tokenExpiry         DateTime?
+  durasi              Int              @default(14)
+  catatan             String?          @db.Text
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bookId Int
+  book   Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([bookId])
+  @@index([status])
+  @@index([tanggalKembali])
+}
+
+model Bookmark {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+
+  userId    Int
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bookId    Int
+  book      Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([userId])
+}
+
+model Skripsi {
+  id           Int      @id @default(autoincrement())
+  title        String   @db.VarChar(400)
+  authorName   String   @db.VarChar(200)
+  nim          String   @db.VarChar(50)
+  tahun        Int
+  abstrak      String?  @db.Text
+  pembimbing   String?  @db.VarChar(200)
+  filePath     String?  @db.VarChar(255)
+  downloads    Int      @default(0)
+  isApproved   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  prodiId      Int?
+  prodi        Prodi?  @relation(fields: [prodiId], references: [id], onDelete: SetNull)
+
+  uploadedById Int?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([prodiId])
+  @@index([isApproved])
+}
+
+model Jurnal {
+  id        Int      @id @default(autoincrement())
+  title     String   @db.VarChar(300)
+  issn      String?  @db.VarChar(20)
+  issnE     String?  @db.VarChar(20)
+  volume    String?  @db.VarChar(100)
+  year      Int
+  articles  Int      @default(0)
+  editor    String?  @db.VarChar(200)
+  penerbit  String?  @db.VarChar(200)
+  frekuensi String?  @db.VarChar(50)
+  warna     String   @default("#6366f1") @db.VarChar(10)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model Setting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique @db.VarChar(100)
+  value     String   @db.Text
+  label     String?  @db.VarChar(200)
+  group     String?  @db.VarChar(50)
+  updatedAt DateTime @updatedAt
+
+  @@index([group])
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  aksi      String   @db.VarChar(100)
+  detail    String?  @db.Text
+  icon      String?  @db.VarChar(10)
+  color     String?  @db.VarChar(10)
+  ipAddress String?  @db.VarChar(45)
+  createdAt DateTime @default(now())
+
+  userId    Int?
+  user      User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique @db.VarChar(512)
+  expiresAt DateTime
+  userAgent String?  @db.VarChar(300)
+  ipAddress String?  @db.VarChar(45)
+  createdAt DateTime @default(now())
+
+  userId    Int
+  user      User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}

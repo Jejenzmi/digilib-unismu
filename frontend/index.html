@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Perpustakaan Digital Universitas Islam Dr. Khez Muttaqien — Akses koleksi buku, jurnal, dan skripsi secara online." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Digilib UNISMU — Perpustakaan Digital</title>
+    <!-- PDF.js untuk auto-thumbnail cover & page count -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if(window.pdfjsLib){
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+  </script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

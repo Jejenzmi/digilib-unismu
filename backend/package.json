@@ -1,0 +1,58 @@
+{
+  "name": "digilib-unismu-backend",
+  "version": "3.3.0",
+  "description": "Backend API Perpustakaan Digital UNISMU \u2014 Production Ready v3.3",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "node prisma/seed.js",
+    "prisma:studio": "prisma studio",
+    "test": "jest --runInBand --forceExit --detectOpenHandles",
+    "test:coverage": "jest --runInBand --forceExit --coverage",
+    "test:watch": "jest --watchAll --runInBand"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.10.0",
+    "prisma": "^5.10.0",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
+    "uuid": "^9.0.0",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "xlsx": "^0.18.5",
+    "nodemailer": "^6.9.9",
+    "minio": "^7.1.3"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.3",
+    "supertest": "^6.3.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "globalSetup": "./tests/setup/globalSetup.js",
+    "globalTeardown": "./tests/setup/globalTeardown.js",
+    "setupFilesAfterEnv": [
+      "./tests/setup/jest.setup.js"
+    ]
+  }
+}

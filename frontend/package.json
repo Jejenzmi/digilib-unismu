@@ -1,0 +1,19 @@
+{
+  "name": "digilib-unismu-frontend",
+  "version": "6.0.0",
+  "description": "Frontend Perpustakaan Digital UNISMU — Universitas Islam Dr. Khez Muttaqien",
+  "private": true,
+  "scripts": {
+    "dev":     "vite",
+    "build":   "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react":     "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite":                 "^5.4.8"
+  }
+}

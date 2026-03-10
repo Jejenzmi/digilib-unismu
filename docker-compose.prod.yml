@@ -1,0 +1,142 @@
+##############################################################################
+# docker-compose.prod.yml — Production Overlay
+#
+# Menambahkan: Nginx (reverse proxy), MinIO (file storage), Backup service
+#
+# Cara pakai:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Untuk HTTPS, selesaikan langkah berikut SETELAH container jalan:
+#   1. Pastikan domain Anda sudah mengarah ke server ini
+#   2. docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#        run --rm certbot certonly --webroot \
+#        -w /var/www/certbot -d DOMAIN_ANDA --email EMAIL_ANDA --agree-tos --no-eff-email
+#   3. Salin nginx/conf.d/digilib.https.conf → nginx/conf.d/digilib.conf
+#      (edit DOMAIN_ANDA di file tersebut terlebih dahulu)
+#   4. docker compose -f docker-compose.yml -f docker-compose.prod.yml restart nginx
+##############################################################################
+
+services:
+
+  # ── Nginx Reverse Proxy ──────────────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: digilib_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/certbot/conf:/etc/letsencrypt:ro
+      - ./nginx/certbot/www:/var/www/certbot:ro
+      - logs_data:/var/log/nginx
+    depends_on:
+      - api
+      - frontend
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Certbot (Let's Encrypt SSL) ───────────────────────────────────────────
+  certbot:
+    image: certbot/certbot:latest
+    container_name: digilib_certbot
+    volumes:
+      - ./nginx/certbot/conf:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
+    # Jalankan manual: docker compose run --rm certbot certonly ...
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+  # ── MinIO Object Storage ──────────────────────────────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-52-20Z
+    container_name: digilib_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER:     ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin_secret_2024}
+      MINIO_BROWSER:       "on"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ── MinIO bucket init ─────────────────────────────────────────────────────
+  minio-init:
+    image: minio/mc:latest
+    container_name: digilib_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 $${MINIO_ACCESS_KEY:-minioadmin} $${MINIO_SECRET_KEY:-minioadmin_secret_2024} &&
+        mc mb --ignore-existing local/digilib &&
+        mc anonymous set download local/digilib/covers &&
+        mc anonymous set download local/digilib/avatar &&
+        echo '✅ MinIO bucket digilib siap'
+      "
+    restart: "no"
+
+  # ── Backup Service ────────────────────────────────────────────────────────
+  backup:
+    build:
+      context: ./backup
+      dockerfile: Dockerfile
+    container_name: digilib_backup
+    restart: unless-stopped
+    environment:
+      MYSQL_HOST:             db
+      MYSQL_USER:             ${MYSQL_USER:-digilib_user}
+      MYSQL_PASSWORD:         ${MYSQL_PASSWORD}
+      MYSQL_DATABASE:         ${MYSQL_DATABASE:-digilib_unismu}
+      BACKUP_RETENTION_DAYS:  ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - backups_data:/backups
+      - uploads_data:/uploads:ro   # read-only untuk backup
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Override api untuk MinIO ──────────────────────────────────────────────
+  api:
+    environment:
+      STORAGE_DRIVER:   ${STORAGE_DRIVER:-minio}
+      MINIO_ENDPOINT:   minio
+      MINIO_PORT:       "9000"
+      MINIO_USE_SSL:    "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin_secret_2024}
+      MINIO_BUCKET:     ${MINIO_BUCKET:-digilib}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      SMTP_HOST:        ${SMTP_HOST:-}
+      SMTP_PORT:        ${SMTP_PORT:-587}
+      SMTP_SECURE:      ${SMTP_SECURE:-false}
+      SMTP_USER:        ${SMTP_USER:-}
+      SMTP_PASS:        ${SMTP_PASS:-}
+      SMTP_FROM:        ${SMTP_FROM:-}
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  # ── Tidak expose port API/Frontend langsung (lewat Nginx) ────────────────
+  # Override port exposure — traffic hanya lewat nginx port 80/443
+  frontend:
+    ports: !reset []  # hapus port 3000 yang ada di base compose
+
+volumes:
+  minio_data:
+    driver: local
+  backups_data:
+    driver: local

@@ -1,0 +1,84 @@
+services:
+
+  # ── Database MySQL 8 ───────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: digilib_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_digilib_2024}
+      MYSQL_DATABASE:      ${MYSQL_DATABASE:-digilib_unismu}
+      MYSQL_USER:          ${MYSQL_USER:-digilib_user}
+      MYSQL_PASSWORD:      ${MYSQL_PASSWORD:-digilib_password}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=mysql_native_password
+      --max_allowed_packet=64M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_digilib_2024}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Backend API ───────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: digilib_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV:             production
+      DATABASE_URL:         mysql://${MYSQL_USER:-digilib_user}:${MYSQL_PASSWORD:-digilib_password}@db:3306/${MYSQL_DATABASE:-digilib_unismu}
+      PORT:                 5000
+      JWT_SECRET:           ${JWT_SECRET:?JWT_SECRET wajib diisi di .env}
+      JWT_REFRESH_SECRET:   ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET wajib diisi di .env}
+      JWT_EXPIRES_IN:       ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      FRONTEND_URL:         ${FRONTEND_URL:-http://localhost:3000}
+      UPLOAD_PATH:          ./uploads
+      MAX_FILE_SIZE_MB:     ${MAX_FILE_SIZE_MB:-20}
+      LOG_LEVEL:            ${LOG_LEVEL:-info}
+    ports:
+      - "${API_PORT:-5000}:5000"
+    volumes:
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    # Setelah API naik: sinkron schema + seed (keduanya idempotent)
+    # CATATAN: prisma db push aman untuk development/staging.
+    # Untuk production dengan data penting, ganti dengan:
+    #   npx prisma migrate deploy
+    # dan kelola migration files dengan benar.
+    command: >
+      sh -c "
+        echo '⏳ Menunggu database siap...' &&
+        npx prisma db push &&
+        echo '✅ Schema sinkron' &&
+        node prisma/seed.js &&
+        echo '✅ Seed selesai' &&
+        node src/index.js
+      "
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  mysql_data:
+    driver: local
+  uploads_data:
+    driver: local
+  logs_data:
+    driver: local
